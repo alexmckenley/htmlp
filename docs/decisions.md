@@ -25,3 +25,7 @@ The compact spec-first approach follows projects such as [JSON](https://www.json
 ## Explicit budget acknowledgment
 
 A 16-character `sig` covers normalized local limits and their reason. `sign` updates it; checking never does. This catches accidental policy edits without changing prompt content. SHA-256 comes from RustCrypto rather than a custom hash implementation. The truncated, unkeyed checksum is not an authorization mechanism; repository review remains necessary for policy changes.
+
+## Runtime attribution independent of files
+
+The optional `runtime` feature gives each prompt fragment an explicit source and role. Applications can adopt it without markup. Tokenizer-measured document budgets, heuristic request estimates, and provider-reported usage are separate types because they measure different things. Missing measurements remain optional; reasoning stays a subset of output, and streaming snapshots merge differently from distinct calls. `render_checked` connects validated files to runtime fragments without inferring categories from section IDs. See the [runtime guide](runtime.md).

@@ -3,16 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HTMLP — Token limits for prompt files</title>
-<meta name="description" content="HTMLP is a strict markup format for prompt files with explicit token limits.">
+<title>htmlp — Keep your agent context in check.</title>
+<meta name="description" content="Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
 <body>
-<header><a class="wordmark" href="{{BASE}}/">HTMLP</a><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<header class="home-header"><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
-<h1>HTMLP</h1>
-<p class="lead">A strict markup format for prompt files with explicit token limits.</p>
-<p>Keep shared instructions within a defined budget. Put a limit and its reason beside the content; check every file before it reaches an agent.</p>
+<h1>htmlp</h1>
+<p class="lead">Keep your agent context in check.</p>
+<p>Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.</p>
+<p>Give each budget a reason. Check files before loading them, and track where your context comes from at runtime.</p>
 <h2>Write a prompt file</h2>
 <p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Write Markdown inside sections.</p>
 <pre><code>&lt;htmlp max-tokens="2k" reason="Loaded on every request."&gt;
@@ -26,6 +27,17 @@ htmlp sign ./prompts
 htmlp check ./prompts</code></pre>
 <p><code>2k</code> means 2,000 tokens. The checker reports invalid markup, missing reasons, changed budget signatures, and exceeded limits. Each file is independent; no repository configuration is needed.</p>
 <p>Signing records each limit and its reason in a short <code>sig</code>. Re-sign intentional budget changes; content edits need only a check.</p>
+<h2>Build typed prompts in Rust</h2>
+<p>Use the <code>runtime</code> feature with or without prompt files. Each fragment has an explicit source and role; request estimates stay separate from provider-reported usage.</p>
+<pre><code>use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+
+let request = ModelRequest::builder("my-model")
+    .fragment(PromptFragment::text(
+        ContentSource::SystemPrompt, Role::System, "Review the change.",
+    ))
+    .build();
+let estimate = request.estimate();</code></pre>
+<p><a href="{{BASE}}/docs/runtime/">Use the Rust interface →</a></p>
 <p><a href="{{BASE}}/docs/">Read the documentation →</a></p>
 </main>
 <footer>HTMLP 0.2 · Alpha · <a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">MIT license</a></footer>

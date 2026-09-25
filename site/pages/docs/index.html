@@ -4,13 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentation — HTMLP</title>
-<meta name="description" content="Write, check, parse, and render HTMLP prompt files.">
+<meta name="description" content="HTMLP prompt files, typed Rust requests, checked rendering, and runtime token accounting.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
 <body>
-<header><a class="wordmark" href="{{BASE}}/">HTMLP</a><nav aria-label="Main"><a href="{{BASE}}/docs/" aria-current="page">Documentation</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/" aria-current="page">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
 <h1>Documentation</h1>
+<p>HTMLP provides a prompt file format and a Rust interface for typed requests and usage accounting. Use either independently, or render checked files into attributed requests.</p>
+<ul>
+<li><a href="#files">Prompt files</a>: sections, token budgets, reasons, signatures, and variables.</li>
+<li><a href="{{BASE}}/docs/runtime/">Rust interface</a>: attributed fragments, tools, checked rendering, and token usage.</li>
+<li><a href="{{BASE}}/api/htmlp/index.html">API reference</a>: generated directly from the current Rust source.</li>
+</ul>
+<h2>Install</h2>
+<p>Version <code>0.2.0-alpha.4</code> is distributed through GitHub, not crates.io. For the command-line checker:</p>
+<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli</code></pre>
+<p>For typed requests, add this Cargo dependency; add <code>tokens</code> to use the built-in tokenizer:</p>
+<pre><code>[dependencies]
+htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }</code></pre>
+<h2 id="files">Prompt files</h2>
 <p>HTMLP 0.2 uses two elements: <code>htmlp</code> and <code>section</code>, plus <code>{{name}}</code> string placeholders. Content is literal Markdown. All declared limits require a nonblank <code>reason</code>.</p>
 <h2>Files and sections</h2>
 <pre><code>&lt;htmlp max-tokens="2k" reason="Shared context."&gt;
@@ -54,7 +67,19 @@ htmlp render rules.htmlp      # checked prompt text</code></pre>
 <h2>Runtime prompts</h2>
 <p>Enable the Rust <code>runtime</code> feature for attributed <code>PromptFragment</code>s, typed text/image/tool content, and <code>ModelRequest</code>s. Every fragment requires a source category and role. <code>request.estimate()</code> provides categorized byte-based estimates with an explicit image reserve; <code>TokenUsage</code> keeps provider-reported usage separate. Missing attribution is <code>None</code>, not zero.</p>
 <p><code>render_checked</code> returns immutable text, its tokenizer measurement, and non-overlapping spans with section ancestry. <code>section(id)</code> selects from a fully checked document; <code>PromptFragment::checked</code> bridges it into a request. Category attributes are not yet supported in markup.</p>
-<p><a href="{{BASE}}/runtime.md">Runtime API guide</a></p>
+<p><a href="{{BASE}}/docs/runtime/">Rust interface guide and examples</a> · <a href="{{BASE}}/runtime.md">Plain Markdown reference</a></p>
+<h2 id="features">Library features</h2>
+<table>
+<thead><tr><th>Feature</th><th>Enables</th></tr></thead>
+<tbody>
+<tr><td>Default</td><td>Typed nodes, parsing, signing, linting, and rendering with a supplied <code>TokenCounter</code>.</td></tr>
+<tr><td><code>runtime</code></td><td>Typed requests, attribution, estimates, and reported usage. Includes JSON support; no provider SDK or tokenizer tables.</td></tr>
+<tr><td><code>tokens</code></td><td>Embedded <code>Cl100k</code> tokenizer.</td></tr>
+<tr><td><code>json</code></td><td>JSON serialization for document types.</td></tr>
+<tr><td><code>schema</code></td><td>JSON Schema generation; includes <code>json</code>. Add <code>runtime</code> for request and usage schemas.</td></tr>
+<tr><td><code>cli</code></td><td>Command-line binary; includes <code>json</code> and <code>tokens</code>.</td></tr>
+</tbody>
+</table>
 <h2>Strict markup</h2>
 <p>Use lowercase tags, quoted attributes, and unique section IDs. Empty elements can self-close: <code>&lt;section id="notes" /&gt;</code>. Otherwise use matching closing tags. Escape literal <code>&lt;</code> as <code>&amp;lt;</code> and <code>&amp;</code> as <code>&amp;amp;</code>, including inside Markdown code fences. Unknown elements and attributes fail. No browser error recovery is performed. Self-closing non-void elements follow XML rules, so ordinary HTML parsing is not equivalent.</p>
 <p>Limits and reasons are editable source. Require review or CI policy to protect changes to budgets. A reason explains a constraint; it cannot prevent an agent from changing it.</p>

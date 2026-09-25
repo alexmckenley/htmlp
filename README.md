@@ -1,8 +1,10 @@
 # HTMLP
 
-A strict markup format for prompt files with explicit token limits.
+Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.
 
 Keep shared instructions within a defined budget. Put a limit and its reason beside the content; check every file before it reaches an agent.
+
+Use the file format, the Rust runtime types, or both. [Prompt file guide](https://htmlp.dev/docs/) · [Rust interface guide](https://htmlp.dev/docs/runtime/).
 
 ```html
 <htmlp max-tokens="2k" reason="Loaded on every request.">
@@ -81,7 +83,25 @@ Other languages can use the CLI's JSON output and generated schema. Native bindi
 
 Enable `runtime` for attributed model requests, typed text/image/tool content, and categorized usage accounting. Every `PromptFragment` requires a source and role. `ModelRequest::estimate()` returns an explicit heuristic; `TokenUsage` keeps it separate from provider-reported usage and represents unavailable attribution as `None`.
 
+```toml
+[dependencies]
+htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }
+```
+
+```rust
+use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+
+let request = ModelRequest::builder("my-model")
+    .fragment(PromptFragment::text(
+        ContentSource::SystemPrompt, Role::System, "Review the change.",
+    ))
+    .build();
+let estimate = request.estimate();
+```
+
 `render_checked` returns immutable text, tokenizer measurements, and section provenance. Pass it to `PromptFragment::checked` to bridge files into attributed requests. [Runtime API guide](docs/runtime.md).
+
+Run the complete file-to-request example with `cargo run --locked --example runtime --features runtime,tokens`. HTMLP supplies types and measurements; your provider adapter sends requests. Category attributes in markup remain future work.
 
 ## Documentation
 

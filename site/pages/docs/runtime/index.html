@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust interface — HTMLP</title>
+<meta name="description" content="Build attributed model requests, render checked prompt files, and track estimates and provider-reported token usage with HTMLP.">
+<link rel="stylesheet" href="{{BASE}}/style.css">
+</head>
+<body>
+<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/" aria-current="page">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<main>
+<h1>Rust interface</h1>
+<p class="lead">Give every prompt fragment a source. Keep estimates and reported usage distinct.</p>
+<p>Use HTMLP's runtime types without writing a prompt file, or connect them to checked file rendering. Your provider adapter sends the request; HTMLP supplies the types and accounting.</p>
+<h2>Install</h2>
+<pre><code>[dependencies]
+htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }</code></pre>
+<p><code>runtime</code> enables JSON types without a provider SDK, async runtime, networking, or tokenizer tables. Add <code>tokens</code> for <code>Cl100k</code>. See all <a href="{{BASE}}/docs/#features">library features</a>.</p>
+<h2>Build a request</h2>
+<pre><code>use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+
+let request = ModelRequest::builder("my-model")
+    .fragment(PromptFragment::text(
+        ContentSource::SystemPrompt,
+        Role::System,
+        "Review the change.",
+    ))
+    .fragment(PromptFragment::text(
+        ContentSource::UserMessage,
+        Role::User,
+        "Check the parser.",
+    ))
+    .max_output_tokens(1024)
+    .build();
+
+let estimate = request.estimate();
+let system_tokens = estimate.tokens_for(&amp;ContentSource::SystemPrompt);</code></pre>
+<p><code>PromptFragment</code> has private fields. Every constructor requires a <code>ContentSource</code> and a <code>Role</code>; <code>ModelRequestBuilder</code> accepts attributed fragments. The type system requires a category, while the caller chooses the correct one. Source and role are independent: repository context can use <code>Role::User</code>.</p>
+<h2>Attribute context</h2>
+<table>
+<thead><tr><th><code>ContentSource</code></th><th>Use for</th></tr></thead>
+<tbody>
+<tr><td><code>SystemPrompt</code></td><td>Base instructions.</td></tr>
+<tr><td><code>ContextBlock { block_id }</code></td><td>Named rules, skills, environment, or retrieved context.</td></tr>
+<tr><td><code>ToolDefinitions</code></td><td>Available tool schemas; builder tools are counted here automatically.</td></tr>
+<tr><td><code>UserMessage</code>, <code>SessionMessage</code></td><td>User-authored input and session messages.</td></tr>
+<tr><td><code>AssistantHistory</code></td><td>Replayed assistant output.</td></tr>
+<tr><td><code>ToolOutput { tool_name }</code></td><td>Results attributed to a named tool.</td></tr>
+<tr><td><code>SystemReminder { origin }</code>, <code>Hook { hook_name }</code></td><td>Harness-injected reminders and hooks.</td></tr>
+<tr><td><code>CompactionSummary</code></td><td>Summarized conversation context.</td></tr>
+</tbody>
+</table>
+<p>Names are part of the source key, so two skill IDs have separate accounting. These categories belong to the Rust and JSON API. Markup currently has no <code>category</code> or <code>source</code> attribute, and section IDs do not assign a source or role.</p>
+<h2>Render a checked file</h2>
+<p>Author a file with budgets and reasons, then run <code>htmlp sign rules.htmlp</code>. Add <code>tokens</code> alongside <code>runtime</code> for this example:</p>
+<pre><code>use htmlp::{Bindings, Cl100k, parse_file, render_checked};
+use htmlp::runtime::{ContentSource, PromptFragment, Role};
+
+let document = parse_file("rules.htmlp").expect("valid markup");
+let counter = Cl100k::new().expect("tokenizer");
+let bindings = Bindings::from([("task".into(), "Review the change.".into())]);
+let rendered = render_checked(&amp;document, &amp;bindings, &amp;counter)
+    .expect("valid signatures, bindings, and budgets");
+let fragment = PromptFragment::checked(
+    ContentSource::SystemPrompt, Role::System, &amp;rendered,
+);</code></pre>
+<p>Handle diagnostics in your application; <code>expect</code> keeps these examples short. Rendering substitutes values literally and enforces every file, section, and direct-item budget. Missing bindings, invalid signatures, and exceeded budgets return errors before any checked text is exposed.</p>
+<ul>
+<li><code>text()</code> returns the final text; <code>into_text()</code> consumes the checked value.</li>
+<li><code>measurement()</code> identifies the tokenizer and complete document count.</li>
+<li><code>section(id)</code> selects text only after the entire document passes validation.</li>
+<li><code>spans()</code> partitions the text into non-overlapping UTF-8 byte ranges with section ancestry and optional variable names.</li>
+<li><code>report()</code> includes overlapping budget measurements. Do not sum parent and child counts.</li>
+</ul>
+<p><code>PromptFragment::checked</code> copies validated text into a fragment. Runtime estimation still uses its explicit heuristic; it does not reuse the file's exact count. Extracting and changing a string does not retain the original validation guarantee.</p>
+<h2>Track token usage</h2>
+<table>
+<thead><tr><th>Type</th><th>Measurement</th></tr></thead>
+<tbody>
+<tr><td><code>TextMeasurement</code></td><td>Complete rendered document count from the chosen tokenizer.</td></tr>
+<tr><td><code>RequestEstimate</code></td><td>Heuristic request allocation by source, including image reserves.</td></tr>
+<tr><td><code>ReportedUsage</code></td><td>Provider-reported totals for one call.</td></tr>
+<tr><td><code>TokenUsage</code></td><td>Optional estimate, optional reported usage, and context window.</td></tr>
+</tbody>
+</table>
+<pre><code>use htmlp::runtime::{ReportedUsage, TokenUsage};
+
+let usage = TokenUsage {
+    estimate: Some(request.estimate()),
+    reported: Some(ReportedUsage {
+        input_tokens: 120,
+        cache_read_tokens: 80,
+        output_tokens: 30,
+        reasoning_tokens: 10,
+        ..Default::default()
+    }),
+    context_window_tokens: 128_000,
+};
+assert_eq!(usage.prompt_tokens(), Some(200));</code></pre>
+<p><code>prompt_tokens()</code> prefers reported input plus cache reads and writes, then falls back to the estimate. It returns <code>None</code> when neither exists. An external harness with unavailable attribution should set <code>estimate: None</code>.</p>
+<p><code>ReportedUsage.input_tokens</code> is uncached input; cache lanes are disjoint. Reasoning tokens are a subset of output, not an extra output charge. Provider adapters normalize their own conventions. Merge cumulative snapshots of the same call with <code>merge_snapshot</code>; sum distinct completed calls with <code>add_call</code>.</p>
+<p><code>ByteEstimator</code> defaults to four UTF-8 payload bytes per token, rounded up once per full source key, plus 8,192 tokens per image. Customize its nonzero <code>bytes_per_token</code> and <code>image_tokens</code> fields, then call <code>estimate(&amp;request)</code>. <code>sources()</code> exposes each allocation; <code>total_tokens()</code> derives the sum. These estimates exclude provider framing and do not enforce a context-window limit.</p>
+<h2>Tools, images, and adapters</h2>
+<p><code>PromptFragment::new</code> accepts typed <code>ContentBlock</code> values: text, reasoning, images, tool uses, and tool results. Supply tool-call IDs with <code>ToolUseId::from_string</code>. Add <code>ToolDefinition</code> values through <code>builder.tool(...)</code>; schemas use JSON. Set output limits and reasoning preferences with <code>max_output_tokens</code> and <code>thinking_level</code>.</p>
+<p>Adapters read <code>request.fragments()</code>, <code>request.tools()</code>, and request settings to build provider-specific messages. <code>bytes_by_source()</code> measures raw payload bytes, including image transport data; it is distinct from token estimation.</p>
+<p>Request helpers return derived requests: <code>with_suffix_instruction</code> appends an attributed user instruction and removes tools; <code>with_warm_probe</code> keeps tools, appends a reminder, and sets a one-token output limit; <code>without_image_blocks</code> replaces images with a text note while preserving attribution. Estimate the resulting request before sending it. Cache behavior and provider compatibility remain the adapter's responsibility.</p>
+<h2>Reference</h2>
+<ul>
+<li><a href="{{BASE}}/api/htmlp/runtime/index.html">Generated runtime API</a> · <a href="{{BASE}}/api/htmlp/index.html">Parser and rendering API</a></li>
+<li><a href="{{BASE}}/request.schema.json">Request JSON Schema</a> · <a href="{{BASE}}/usage.schema.json">Usage JSON Schema</a></li>
+<li><a href="{{BASE}}/runtime.md">Plain Markdown reference</a></li>
+<li><a href="https://github.com/alexmckenley/htmlp/blob/main/examples/runtime.rs">Runnable Rust example</a></li>
+</ul>
+<p>The JSON schemas describe serialized shapes. <code>PromptFragment</code> and <code>ModelRequest</code> are constructed through Rust APIs, not deserialized from JSON. HTMLP does not send model requests or provide native bindings for other languages. Other languages can use the CLI's JSON document output.</p>
+</main>
+<footer>HTMLP 0.2 · Alpha · <a href="{{BASE}}/">Home</a></footer>
+</body>
+</html>

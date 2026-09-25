@@ -1,5 +1,9 @@
 //! Strict, self-contained prompt files. The default library uses `xmlparser` and `sha2`; token counting is an injected [`TokenCounter`]. Enable `tokens`
 //! for CL100K, `json` for serialization, or `cli` for the standalone tool.
+//! Enable `runtime` for attributed model requests and token usage accounting,
+//! independently of prompt files or provider SDKs. Use [`render_checked`] to
+//! obtain immutable, validated text and section provenance before constructing
+//! a runtime fragment. See the [Rust guide](https://htmlp.dev/docs/runtime/).
 //!
 //! ```
 //! let doc = htmlp::parse(r#"<htmlp max-tokens="10k" reason="Shared context."><section id="task">Review.</section></htmlp>"#)?;

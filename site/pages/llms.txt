@@ -1,6 +1,11 @@
 # HTMLP 0.2
 
-A strict markup format for prompt files with explicit token limits.
+Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.
+
+Use prompt files, Rust runtime types, or both. Current release: v0.2.0-alpha.4.
+CLI: cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
+Rust: htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }
+Add tokens for Cl100k. No default features; runtime includes json, not tokenizer tables.
 
 Save as .htmlp:
 <htmlp max-tokens="1k" reason="Shared context.">
@@ -23,11 +28,26 @@ render substitutes literal bindings and checks final file and section budgets.
 Inline limits and reasons are editable; policy changes need review.
 
 Runtime feature: attributed fragments, model requests, explicit estimates, reported usage.
+PromptFragment::text(source, role, text); ModelRequest::builder(model).fragment(fragment).build().
+ContentSource categories: SystemPrompt, ContextBlock{block_id}, ToolDefinitions, UserMessage,
+SessionMessage, AssistantHistory, ToolOutput{tool_name}, SystemReminder{origin}, Hook{hook_name}, CompactionSummary.
+Role is independently System, User, or Assistant. Your provider adapter sends requests.
+request.estimate(): UTF-8 bytes grouped by full source, rounded up at 4 bytes/token; 8192 tokens/image.
+ByteEstimator policy is configurable. Estimates exclude provider framing and do not enforce context capacity.
+TokenUsage separates optional estimate and optional reported usage; unavailable is None, not zero.
+Reported input excludes cache reads/writes; prompt_tokens adds all three. Reasoning is part of output.
+merge_snapshot takes maxima within one call; add_call sums distinct calls.
 render_checked returns immutable text, measurements, and section provenance.
+PromptFragment::checked(source, role, &rendered) bridges checked text into a request.
+section(id) selects only after the entire document passes. Do not sum overlapping budget measurements.
 No category attributes in markup yet.
-Runtime guide: {{BASE}}/runtime.md
+Rust guide: {{BASE}}/docs/runtime/
+Plain runtime reference: {{BASE}}/runtime.md
 Guide: {{BASE}}/docs/
 Specification: {{BASE}}/spec.md
 Schema: {{BASE}}/document.schema.json
+Request schema: {{BASE}}/request.schema.json
+Usage schema: {{BASE}}/usage.schema.json
 Rust API: {{BASE}}/api/htmlp/index.html
+Runtime API: {{BASE}}/api/htmlp/runtime/index.html
 Source: https://github.com/alexmckenley/htmlp

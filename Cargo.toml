@@ -9,7 +9,7 @@ repository = "https://github.com/alexmckenley/htmlp"
 homepage = "https://htmlp.dev/"
 keywords = ["prompt", "parser", "lint", "tokens", "agents"]
 categories = ["parser-implementations", "command-line-utilities"]
-include = ["/src/**", "/examples/*.rs", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICENSE", "/schema/**", "/docs/**"]
+include = ["/src/**", "/examples/*.rs", "/examples/*.htmlp", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICENSE", "/schema/**", "/docs/**"]
 
 [features]
 default = []
@@ -39,6 +39,10 @@ required-features = ["schema"]
 [[example]]
 name = "runtime_schema"
 required-features = ["schema", "runtime"]
+
+[[example]]
+name = "runtime"
+required-features = ["runtime", "tokens"]
 
 [profile.release]
 opt-level = "z"
