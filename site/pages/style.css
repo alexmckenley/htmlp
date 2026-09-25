@@ -6,7 +6,7 @@ header { display: flex; align-items: baseline; justify-content: space-between; f
 a { color: #174a77; text-underline-offset: .17em; }
 a:hover { color: #081c30; }
 a:focus-visible { outline: 2px solid #174a77; outline-offset: 4px; }
-.wordmark { color: inherit; font: bold 1rem ui-monospace, monospace; letter-spacing: .06em; text-decoration: none; }
+.wordmark { color: #17212b; font-family: inherit; font-size: 1rem; font-weight: bold; line-height: 1.25; letter-spacing: -.035em; text-decoration: none; }
 nav { display: flex; flex-wrap: wrap; gap: 1.5rem; font: .85rem/1.6 system-ui, sans-serif; }
 main { padding: 2rem 0; }
 h1, h2, h3 { line-height: 1.25; color: #17212b; }
