@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+.env*
+!.env.example
+site/public/api/
+site/public/schema/
+site/public/spec.md
+site/.vite/
+site/.wrangler/
+.DS_Store

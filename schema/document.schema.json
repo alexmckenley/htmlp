@@ -1,0 +1,233 @@
+{
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "document"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "limits": {
+      "$ref": "#/definitions/DocumentLimits"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/MessageNode"
+      }
+    },
+    "position": {
+      "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+      "$ref": "#/definitions/Position"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "children",
+    "kind",
+    "limits",
+    "version"
+  ],
+  "definitions": {
+    "DocumentLimits": {
+      "description": "Document-local limits may only tighten the external policy.",
+      "type": "object",
+      "properties": {
+        "maxChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxSectionChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxSystemChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxUserChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxSections": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessageNode": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "message"
+        },
+        "role": {
+          "$ref": "#/definitions/Role"
+        },
+        "maxChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentNode"
+          }
+        },
+        "position": {
+          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+          "$ref": "#/definitions/Position"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "children",
+        "kind",
+        "role"
+      ]
+    },
+    "Role": {
+      "description": "Roles supported by version 0.1. Provider adaptation belongs to the caller.",
+      "type": "string",
+      "enum": [
+        "system",
+        "user"
+      ]
+    },
+    "ContentNode": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TextNode"
+        },
+        {
+          "$ref": "#/definitions/VariableNode"
+        },
+        {
+          "$ref": "#/definitions/SectionNode"
+        }
+      ]
+    },
+    "TextNode": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "text"
+        },
+        "value": {
+          "type": "string"
+        },
+        "position": {
+          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+          "$ref": "#/definitions/Position"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "Position": {
+      "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "line",
+        "offset"
+      ]
+    },
+    "VariableNode": {
+      "description": "A bounded string substitution; values are never evaluated or parsed as markup.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "variable"
+        },
+        "name": {
+          "type": "string"
+        },
+        "maxChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "position": {
+          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+          "$ref": "#/definitions/Position"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "maxChars",
+        "name"
+      ]
+    },
+    "SectionNode": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "section"
+        },
+        "name": {
+          "type": "string"
+        },
+        "maxChars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContentNode"
+          }
+        },
+        "position": {
+          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+          "$ref": "#/definitions/Position"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "children",
+        "kind",
+        "name"
+      ]
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTMLP PromptDocument 0.1",
+  "$id": "https://alexmckenley.github.io/htmlp/schema/document.schema.json"
+}

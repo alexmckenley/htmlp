@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible parser, lint, loader, or documentation issue.
+labels: [bug]
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include HTMLP source, policy, command, and version. Remove private content.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

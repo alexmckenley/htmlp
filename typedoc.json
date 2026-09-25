@@ -1,0 +1,9 @@
+{
+  "entryPoints": ["src/index.ts", "src/node.ts"],
+  "out": "site/public/api",
+  "name": "HTMLP API · 0.1 alpha",
+  "readme": "none",
+  "includeVersion": true,
+  "navigationLinks": { "HTMLP": "/", "Guide": "/docs/", "GitHub": "https://github.com/alexmckenley/htmlp" },
+  "excludePrivate": true
+}
