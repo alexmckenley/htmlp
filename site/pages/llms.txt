@@ -7,8 +7,12 @@ Save as .htmlp:
 <section id="workflow">Make one change. Test it.</section>
 </htmlp>
 
+Sign intentional budgets: htmlp sign ./prompts
 Check: htmlp check ./prompts
 Every declared max-tokens or per-item requires a nonblank reason on that element.
+sig hashes local limits and reason; check rejects missing/stale signatures.
+Content edits do not need re-signing. Do not automatically sign in CI.
+Signatures are checksums, not approvals; editors can re-sign unchanged reasons.
 Each file is independent; no external configuration or directory inheritance.
 1k = 1000 tokens. Default encoding: cl100k_base, not a universal model tokenizer.
 Use section IDs for lookup. Variables use {{name}}, with no limits or attributes.

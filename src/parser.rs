@@ -151,6 +151,7 @@ fn limits(frame: &Frame) -> Result<Limits, Diagnostic> {
         max_tokens: get("max-tokens")?,
         per_item: get("per-item")?,
         reason: frame.attrs.get("reason").cloned(),
+        sig: frame.attrs.get("sig").cloned(),
     };
     if (limits.max_tokens.is_some() || limits.per_item.is_some())
         && limits.reason.as_ref().is_none_or(|r| r.trim().is_empty())
@@ -246,8 +247,15 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     Diagnostic::new("syntax", "Unexpected attribute", locations.at(span.start()))
                 })?;
                 let allowed: &[&str] = match frame.name.as_str() {
-                    "htmlp" => &["version", "tokenizer", "max-tokens", "per-item", "reason"],
-                    "section" => &["id", "max-tokens", "per-item", "reason"],
+                    "htmlp" => &[
+                        "version",
+                        "tokenizer",
+                        "max-tokens",
+                        "per-item",
+                        "reason",
+                        "sig",
+                    ],
+                    "section" => &["id", "max-tokens", "per-item", "reason", "sig"],
                     _ => &["id"],
                 };
                 if !prefix.is_empty() || !allowed.contains(&local.as_str()) {

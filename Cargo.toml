@@ -1,6 +1,6 @@
 [package]
 name = "htmlp"
-version = "0.2.0-alpha.2"
+version = "0.2.0-alpha.3"
 edition = "2024"
 rust-version = "1.85"
 description = "Strict markup for prompt files with explicit token limits."
@@ -19,6 +19,7 @@ cli = ["json", "tokens"]
 schema = ["json", "dep:schemars"]
 
 [dependencies]
+sha2 = { version = "0.10.9", default-features = false }
 xmlparser = { version = "0.13.6", default-features = false }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }

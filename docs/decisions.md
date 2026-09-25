@@ -12,7 +12,7 @@ No top-level configuration or directory inheritance in 0.2. Running on a directo
 
 ## Rust and optional vocabulary data
 
-Rust does not require a garbage collector or language runtime. The library defaults to only the XML tokenizer dependency. Exact token counting uses [tiktoken-rs](https://github.com/zurawiki/tiktoken-rs), an optional feature; the CLI includes it. Encoding tables are substantial data even when the parser is small. Other SDKs can inject a `TokenCounter` matching the document's declared tokenizer.
+Rust does not require a garbage collector or language runtime. The library defaults to the XML tokenizer and RustCrypto SHA-256 dependencies. Exact token counting uses [tiktoken-rs](https://github.com/zurawiki/tiktoken-rs), an optional feature; the CLI includes it. Encoding tables are substantial data even when the parser is small. Other SDKs can inject a `TokenCounter` matching the document's declared tokenizer.
 
 [Cargo release profiles](https://doc.rust-lang.org/cargo/reference/profiles.html) use size optimization, LTO, one codegen unit, stripping, and abort-on-panic here. These settings favor size, not necessarily maximum throughput. Release artifacts are native binaries and remain subject to platform/ABI requirements. We measure sizes instead of promising a universally tiny executable.
 
@@ -21,3 +21,7 @@ Rust does not require a garbage collector or language runtime. The library defau
 The homepage and guide are hand-authored HTML with one small stylesheet, no client JavaScript, and no web-font requests. They are readable directly with curl. Rustdoc generates the separate API reference; schemars generates the JSON contract from Rust types.
 
 The compact spec-first approach follows projects such as [JSON](https://www.json.org/json-en.html) and [TOML](https://toml.io/en/), without asserting a universal consensus about the best documentation. Parser-to-typed-tree separation also resembles [mdast](https://github.com/syntax-tree/mdast); HTMLP does not parse Markdown into a Markdown AST.
+
+## Explicit budget acknowledgment
+
+A 16-character `sig` covers normalized local limits and their reason. `sign` updates it; checking never does. This catches accidental policy edits without changing prompt content. SHA-256 comes from RustCrypto rather than a custom hash implementation. The truncated, unkeyed checksum is not an authorization mechanism; repository review remains necessary for policy changes.

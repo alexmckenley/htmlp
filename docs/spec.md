@@ -20,8 +20,8 @@ This is HTML-inspired markup with strict XML-style lexical rules, not arbitrary 
 
 | Element | Required | Optional |
 | --- | --- | --- |
-| `htmlp` | `max-tokens`, `reason` | `version`, `tokenizer`, `per-item` |
-| `section` | none | `id`, `max-tokens`, `per-item`, `reason` |
+| `htmlp` | `max-tokens`, `reason` | `version`, `tokenizer`, `per-item`, `sig` |
+| `section` | none | `id`, `max-tokens`, `per-item`, `reason`, `sig` |
 
 `version` defaults to `0.2`; other versions fail. `tokenizer` defaults to `cl100k_base`. The library permits other identifiers, but linting requires an exactly matching `TokenCounter::name()`. The CLI supports only `cl100k_base`.
 
@@ -45,6 +45,22 @@ Unsigned decimal integers denote tokens. A `k` or `K` suffix multiplies by 1,000
 
 Each file is checked independently. There is no external configuration, ancestor inheritance, implicit directory-context aggregation, or automatic agent loading. Inline policies and reasons remain editable source; repository review and protected CI must govern policy changes if needed.
 
+## Budget signatures
+
+Every element declaring `max-tokens` or `per-item` requires a matching `sig` at check, compile, and render time. Unsigned source may be authored and parsed; `sign` generates the attribute. A signature on an element without a local limit is an error. Signatures cover only the two local limits and their reason, not prompt content, IDs, tokenizer, hierarchy, inherited limits, or author identity. Variables have no signatures.
+
+The canonical byte sequence is:
+
+1. ASCII `htmlp-budget-v1` followed by one zero byte.
+2. For `max-tokens`, then `per-item`: one byte `0` if absent, or one byte `1` followed by the expanded unsigned integer as eight big-endian bytes.
+3. The decoded, line-ending-normalized reason's UTF-8 byte length as eight big-endian bytes, followed by those UTF-8 bytes. No trimming or Unicode normalization occurs.
+
+`sig` is the first eight bytes of SHA-256 of this sequence, written as 16 lowercase hexadecimal characters. Attribute order, quote style, numeric entity spelling, and equivalent token units do not change it. Test vector: `max-tokens="1k" per-item="100" reason="Shared &amp; brief."` produces `29580b676d56bf50`.
+
+Missing or mismatched signatures produce diagnostic code `signature` with guidance to rerun `htmlp sign`. Signing replaces stale values, adds missing ones, and removes orphan signatures. It preserves other source bytes, including Markdown, comments, attribute spelling, and line endings. All selected files are parsed before any writes; each changed file is replaced atomically with its permissions retained. A later I/O failure can leave earlier files updated; this is not a directory transaction. Avoid concurrent edits while signing. Signed output must still fit the 4 MiB source cap.
+
+This is an explicit change-acknowledgment step, not cryptographic authentication. Anyone able to edit the source can re-sign unchanged reasons or remove entire constraints. It does not prove a reason changed or that a person approved it. Do not automatically sign in CI; check committed signatures and review budget changes.
+
 ## Text and tokens
 
 Rendering concatenates text in source order, strips structural markup and comments, and substitutes variables literally. It inserts no separators. Indentation and whitespace within the root count. CRLF and CR normalize to LF. Text outside the root does not count.
@@ -59,7 +75,7 @@ Rendering requires every binding, substitutes literal values, and tokenizes ever
 
 ## Typed API and JSON
 
-`Document` contains a version, tokenizer identifier, `Limits`, `Vec<Node>`, and source position. `Node` is the enum `Text`, `Section`, or `Variable`. `Section` contains an optional ID, limits, children, and position. `Variable` contains only an ID and source position. Constructors can build the same structure without a source file; `lint` validates that structure too.
+`Document` contains a version, tokenizer identifier, `Limits`, `Vec<Node>`, and source position. `Node` is the enum `Text`, `Section`, or `Variable`. `Section` contains an optional ID, limits, children, and position. `Variable` contains only an ID and source position. Constructors can build the same structure without a source file; `Document::sign()` explicitly accepts its budgets; `lint` validates that structure and its signatures too.
 
 `get_element_by_id` searches descendants and returns `ElementRef`, a section or variable reference (the first occurrence for repeated variable names). `sections()` returns direct child sections in source order. `to_string()` extracts text without validation and represents unbound variables as `{{id}}`; it is neither source serialization nor a checked rendered prompt.
 
@@ -69,8 +85,8 @@ The `schema` feature generates the document schema from these Rust types. `cargo
 
 ## CLI
 
-`check PATH [--json]` walks files deterministically and checks each `.htmlp` file. `parse FILE` validates syntax and returns an AST; `compile FILE` also checks fully static budgets; variable-dependent budgets still require rendering. `render FILE [--vars FILE]` returns checked plaintext, without adding a newline. Bindings are a JSON object of string values. `watch PATH` polls content every 500 ms and emits editor diagnostics on changes.
+`sign PATH` updates budget signatures. `check PATH [--json]` walks files deterministically and checks each `.htmlp` file. `parse FILE` validates syntax and returns an AST; `compile FILE` also checks fully static budgets; variable-dependent budgets still require rendering. `render FILE [--vars FILE]` returns checked plaintext, without adding a newline. Bindings are a JSON object of string values. `watch PATH` polls content every 500 ms and emits editor diagnostics on changes.
 
-Directory walks skip symlinks and directories named `.git`, `node_modules`, `target`, `dist`, and `vendor`; recursion is capped at 128 levels. An explicitly supplied file must have the `.htmlp` extension for `check`. No matching files is an operational error. Other file commands accept an explicit path regardless of extension.
+Directory walks skip symlinks and directories named `.git`, `node_modules`, `target`, `dist`, and `vendor`; recursion is capped at 128 levels. An explicitly supplied file must have the `.htmlp` extension for `check` and `sign`. No matching files is an operational error. Other file commands accept an explicit path regardless of extension.
 
-Exit status: 0 success, 1 per-file validation failure (including unreadable input files encountered as file reports), 2 invalid command or operational failure. Diagnostics are `path:line:column: error code: message` on stderr. JSON output and rendered text go to stdout. Successful `check` output reports how many budgets are deferred. Watch remains active until interrupted; it is for editors, not a CI success check.
+Exit status: 0 success, 1 per-file validation failure (including unreadable input files encountered as file reports), 2 invalid command or operational failure (including signing preflight failure). Diagnostics are `path:line:column: error code: message` on stderr. JSON output and rendered text go to stdout. Successful `check` output reports how many budgets are deferred. Watch remains active until interrupted; it is for editors, not a CI success check.
