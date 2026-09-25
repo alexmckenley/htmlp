@@ -38,7 +38,7 @@ impl Document {
         // Iterative traversal also supports trees built outside the parser.
         let mut pending: Vec<_> = self.children.iter_mut().collect();
         while let Some(node) = pending.pop() {
-            if let Node::Section(section) = node {
+            if let Node::Element(section) = node {
                 section.limits.sig = budget_signature(&section.limits);
                 pending.extend(section.children.iter_mut());
             }
@@ -56,7 +56,7 @@ pub fn sign_source(source: &str) -> Result<String, Diagnostic> {
     signatures.insert(doc.position.offset, budget_signature(&doc.limits));
     let mut pending: Vec<_> = doc.children.iter().collect();
     while let Some(node) = pending.pop() {
-        if let Node::Section(section) = node {
+        if let Node::Element(section) = node {
             signatures.insert(section.position.offset, budget_signature(&section.limits));
             pending.extend(section.children.iter());
         }

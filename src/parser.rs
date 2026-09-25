@@ -1,4 +1,4 @@
-use crate::{Diagnostic, Document, Limits, Node, Position, Section, Variable};
+use crate::{Diagnostic, Document, Element, Limits, Node, Position, Variable};
 use std::collections::{BTreeMap, BTreeSet};
 use xmlparser::{ElementEnd, Token, Tokenizer};
 
@@ -85,7 +85,7 @@ impl<'a> Locations<'a> {
         }
     }
 }
-fn valid_char(c: char) -> bool {
+pub(crate) fn valid_char(c: char) -> bool {
     matches!(c, '\t' | '\n' | '\r') || (c >= '\u{20}' && c != '\u{fffe}' && c != '\u{ffff}')
 }
 fn decode(value: &str) -> Result<String, String> {
@@ -133,6 +133,15 @@ pub(crate) fn valid_id(id: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b':'))
 }
+/// Lowercase ASCII names; the htmlp name is reserved for the document root.
+pub(crate) fn valid_element_name(name: &str) -> bool {
+    name != "htmlp"
+        && name.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
 struct Frame {
     name: String,
     attrs: BTreeMap<String, String>,
@@ -173,7 +182,7 @@ fn append(nodes: &mut Vec<Node>, text: String) {
 }
 
 /// Parse strict HTML-inspired markup using a tested XML tokenizer. XML-only
-/// constructs, namespaces, unknown names, and implicit repair are rejected.
+/// constructs, namespaces, invalid names, unknown attributes, and implicit repair are rejected.
 /// Empty elements may use self-closing tags. Markdown indentation is preserved, not inferred or rewritten.
 pub fn parse(source: &str) -> Result<Document, Diagnostic> {
     if source.len() > 4 * 1024 * 1024 {
@@ -211,10 +220,12 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                 span,
             } => {
                 let p = locations.at(span.start());
-                if !prefix.is_empty() || !matches!(local.as_str(), "htmlp" | "section") {
+                if !prefix.is_empty()
+                    || !(local.as_str() == "htmlp" || valid_element_name(local.as_str()))
+                {
                     return Err(Diagnostic::new(
                         "element",
-                        "Only lowercase htmlp and section are supported",
+                        "Element names must start with a lowercase ASCII letter and contain only lowercase letters, digits, or hyphens",
                         p,
                     ));
                 }
@@ -255,8 +266,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                         "reason",
                         "sig",
                     ],
-                    "section" => &["id", "max-tokens", "per-item", "reason", "sig"],
-                    _ => &["id"],
+                    _ => &["id", "max-tokens", "per-item", "reason", "sig"],
                 };
                 if !prefix.is_empty() || !allowed.contains(&local.as_str()) {
                     return Err(Diagnostic::new(
@@ -314,10 +324,10 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     }
                     let budget = limits(&frame)?;
                     if frame.name == "htmlp" {
-                        if frame.attrs.get("version").is_some_and(|v| v != "0.2") {
+                        if frame.attrs.get("version").is_some_and(|v| v != "0.3") {
                             return Err(Diagnostic::new(
                                 "version",
-                                "Only version 0.2 is supported",
+                                "Only version 0.3 is supported",
                                 frame.position,
                             ));
                         }
@@ -341,14 +351,15 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                             ));
                         }
                         result = Some(Document {
-                            version: "0.2".into(),
+                            version: "0.3".into(),
                             tokenizer,
                             limits: budget,
                             children: frame.children,
                             position: frame.position,
                         });
                     } else {
-                        let node = Node::Section(Section {
+                        let node = Node::Element(Element {
+                            name: frame.name,
                             id: frame.attrs.get("id").cloned(),
                             limits: budget,
                             children: frame.children,
@@ -364,40 +375,23 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
             }
             Token::Text { text } => {
                 if let Some(frame) = stack.last_mut() {
-                    let raw = text.as_str();
-                    let mut cursor = 0;
-                    while let Some(relative) = raw[cursor..].find("{{") {
-                        let start = cursor + relative;
-                        let p = locations.at(text.start() + start);
-                        let end = raw[start + 2..]
-                            .find("}}")
-                            .map(|i| start + 2 + i)
-                            .ok_or_else(|| {
-                                Diagnostic::new("variable", "Unclosed {{name}} placeholder", p)
-                            })?;
-                        let id = &raw[start + 2..end];
-                        if !valid_id(id) || ids.contains(id) {
-                            return Err(Diagnostic::new(
-                                "variable",
-                                "Variable names must be valid IDs and cannot match a section ID",
-                                p,
-                            ));
+                    let nodes = parse_text(text.as_str(), text.start(), &locations, true)?;
+                    for node in nodes {
+                        if let Node::Variable(variable) = &node {
+                            if ids.contains(&variable.id) {
+                                return Err(Diagnostic::new(
+                                    "variable",
+                                    "Variable name cannot match an element ID",
+                                    variable.position,
+                                ));
+                            }
+                            variables.insert(variable.id.clone());
                         }
-                        let decoded = decode(&raw[cursor..start]).map_err(|e| {
-                            Diagnostic::new("entity", e, locations.at(text.start() + cursor))
-                        })?;
-                        append(&mut frame.children, decoded);
-                        variables.insert(id.to_string());
-                        frame.children.push(Node::Variable(Variable {
-                            id: id.to_string(),
-                            position: p,
-                        }));
-                        cursor = end + 2;
+                        match node {
+                            Node::Text { value } => append(&mut frame.children, value),
+                            node => frame.children.push(node),
+                        }
                     }
-                    let decoded = decode(&raw[cursor..]).map_err(|e| {
-                        Diagnostic::new("entity", e, locations.at(text.start() + cursor))
-                    })?;
-                    append(&mut frame.children, decoded);
                 } else if !text.as_str().trim().is_empty() {
                     return Err(Diagnostic::new(
                         "root",
@@ -424,4 +418,69 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
         ));
     }
     result.ok_or_else(|| Diagnostic::new("root", "Missing htmlp root", Position::default()))
+}
+
+/// Parse Rust text interpolation into the same nodes as markup placeholders.
+/// Only {{name}} is special. Other text, including < and &, is literal; use
+/// Node::text for literal braces. HTML source decodes entities separately.
+pub fn parse_template(source: &str) -> Result<Vec<Node>, Diagnostic> {
+    if source.len() > 4 * 1024 * 1024 {
+        return Err(Diagnostic::new(
+            "source-size",
+            "Template exceeds 4 MiB",
+            Position::default(),
+        ));
+    }
+    let locations = Locations::new(source);
+    if let Some((offset, _)) = source.char_indices().find(|(_, c)| !valid_char(*c)) {
+        return Err(Diagnostic::new(
+            "character",
+            "Invalid control character",
+            locations.at(offset),
+        ));
+    }
+    parse_text(source, 0, &locations, false)
+}
+fn parse_text(
+    raw: &str,
+    offset: usize,
+    locations: &Locations<'_>,
+    entities: bool,
+) -> Result<Vec<Node>, Diagnostic> {
+    let literal = |start: usize, end: usize| {
+        if entities {
+            decode(&raw[start..end])
+                .map_err(|e| Diagnostic::new("entity", e, locations.at(offset + start)))
+        } else {
+            Ok(raw[start..end].to_owned())
+        }
+    };
+    let mut nodes = Vec::new();
+    let mut cursor = 0;
+    while let Some(relative) = raw[cursor..].find("{{") {
+        let start = cursor + relative;
+        let position = locations.at(offset + start);
+        let end = raw[start + 2..]
+            .find("}}")
+            .map(|i| start + 2 + i)
+            .ok_or_else(|| {
+                Diagnostic::new("variable", "Unclosed {{name}} placeholder", position)
+            })?;
+        let id = &raw[start + 2..end];
+        if !valid_id(id) {
+            return Err(Diagnostic::new(
+                "variable",
+                "Variable names must be valid IDs",
+                position,
+            ));
+        }
+        append(&mut nodes, literal(cursor, start)?);
+        nodes.push(Node::Variable(Variable {
+            id: id.into(),
+            position,
+        }));
+        cursor = end + 2;
+    }
+    append(&mut nodes, literal(cursor, raw.len())?);
+    Ok(nodes)
 }

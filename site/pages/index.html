@@ -4,41 +4,43 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>htmlp — Statically enforceable token limits</title>
-<meta name="description" content="Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.">
+<meta name="description" content="Statically enforceable token limits for context files. A strict prompt file format and a matching Rust API for agent context and skills.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
 <body>
-<header class="home-header"><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<header class="home-header"><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/rust/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
 <h1>htmlp</h1>
 <p class="lead">Statically enforceable token limits for context files</p>
 <p>Agents write their own skills. Context fills with slop. Prompts grow unbounded. HTMLP enforces a token budget, pushing agents to decide what belongs, what to cut, and when a larger budget needs justification.</p>
 <h2>Write a prompt file</h2>
-<p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Write Markdown inside sections.</p>
+<p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Name elements whatever fits and write Markdown inside them.</p>
 <pre><code>&lt;htmlp max-tokens="2k" reason="Loaded on every request."&gt;
-&lt;section id="workflow" max-tokens="500" reason="Keep routine steps short."&gt;
+&lt;workflow id="routine" max-tokens="500" reason="Keep routine steps short."&gt;
 Read the code. Make one change. Run its tests.
-&lt;/section&gt;
+&lt;/workflow&gt;
 &lt;/htmlp&gt;</code></pre>
 <h2>Sign and check</h2>
-<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
+<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.3.0-alpha.1 --features cli
 htmlp sign ./prompts
 htmlp check ./prompts</code></pre>
 <p><code>2k</code> means 2,000 tokens. The checker reports invalid markup, missing reasons, changed budget signatures, and exceeded limits. Each file is independent; no repository configuration is needed.</p>
 <p>Signing records each limit and its reason in a short <code>sig</code>. Re-sign intentional budget changes; content edits need only a check.</p>
-<h2>Build typed prompts in Rust</h2>
-<p>Use the <code>runtime</code> feature with or without prompt files. Each fragment has an explicit source and role; request estimates stay separate from provider-reported usage.</p>
-<pre><code>use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+<h2>Build the same document in Rust</h2>
+<p>Markup and Rust share one primitive: an element with a name, an optional id, and budgets. <code>template</code> interpolates <code>{{name}}</code> exactly as a file does, so an in-memory document produces the same nodes as its parsed equivalent.</p>
+<pre><code>use htmlp::{Document, Element};
 
-let request = ModelRequest::builder("my-model")
-    .fragment(PromptFragment::text(
-        ContentSource::SystemPrompt, Role::System, "Review the change.",
-    ))
-    .build();
-let estimate = request.estimate();</code></pre>
-<p><a href="{{BASE}}/docs/runtime/">Use the Rust interface →</a></p>
+let workflow = Element::new("workflow")
+    .id("routine")
+    .max_tokens(500, "Keep routine steps short.")
+    .template("Read {{path}}. Make one change.")
+    .expect("valid template");
+let mut document = Document::new(2_000, "Loaded on every request.", vec![workflow.into()]);
+document.sign();</code></pre>
+<p>HTMLP validates structure and token budgets. Roles, message kinds, and usage accounting stay in your own types, where you can change them without a format release.</p>
+<p><a href="{{BASE}}/docs/rust/">Use the Rust interface →</a></p>
 <p><a href="{{BASE}}/docs/">Read the documentation →</a></p>
 </main>
-<footer>HTMLP 0.2 · Alpha · <a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">MIT license</a></footer>
+<footer>HTMLP 0.3 · Alpha · <a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">MIT license</a></footer>
 </body>
 </html>

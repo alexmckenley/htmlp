@@ -1,4 +1,6 @@
-use crate::{Bindings, Diagnostic, Document, Limits, Measurement, Node, Position, Report};
+use crate::{
+    Bindings, Diagnostic, Document, ElementOrigin, Limits, Measurement, Node, Position, Report,
+};
 use std::collections::BTreeMap;
 
 /// Inject a tokenizer to keep the parser independent of large vocabulary tables.
@@ -59,10 +61,10 @@ fn require_reason(limits: &Limits, position: Position, errors: &mut Vec<Diagnost
 fn validate(doc: &Document, counter: &impl TokenCounter) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     require_reason(&doc.limits, doc.position, &mut errors);
-    if doc.version != "0.2" || doc.limits.max_tokens.is_none() {
+    if doc.version != "0.3" || doc.limits.max_tokens.is_none() {
         errors.push(Diagnostic::new(
             "document",
-            "Expected version 0.2 and a root max-tokens limit",
+            "Expected version 0.3 and a root max-tokens limit",
             doc.position,
         ));
     }
@@ -85,7 +87,7 @@ fn validate(doc: &Document, counter: &impl TokenCounter) -> Vec<Diagnostic> {
         errors: &mut Vec<Diagnostic>,
     ) {
         for node in nodes {
-            if matches!(node, Node::Section(_)) && depth > 64 {
+            if matches!(node, Node::Element(_)) && depth > 64 {
                 errors.push(Diagnostic::new(
                     "depth",
                     "Maximum element depth is 64",
@@ -95,7 +97,14 @@ fn validate(doc: &Document, counter: &impl TokenCounter) -> Vec<Diagnostic> {
             }
             let (id, position) = match node {
                 Node::Text { .. } => continue,
-                Node::Section(s) => {
+                Node::Element(s) => {
+                    if !crate::parser::valid_element_name(&s.name) {
+                        errors.push(Diagnostic::new(
+                            "element",
+                            format!("Invalid element name: {}", s.name),
+                            s.position,
+                        ));
+                    }
                     require_reason(&s.limits, s.position, errors);
                     walk(&s.children, ids, depth + 1, errors);
                     (s.id.as_deref(), s.position)
@@ -130,8 +139,7 @@ impl<C: TokenCounter> Analyzer<'_, C> {
         &mut self,
         pieces: &[Piece],
         cap: Option<u64>,
-        id: Option<&str>,
-        position: Position,
+        origin: &ElementOrigin,
         reason: Option<&str>,
     ) {
         let tokens = size(pieces, self.counter);
@@ -141,15 +149,17 @@ impl<C: TokenCounter> Analyzer<'_, C> {
                     "budget",
                     format!(
                         "{}: {tokens} tokens exceeds {limit} — {}",
-                        id.unwrap_or("document/section"),
+                        origin.id.as_deref().unwrap_or(&origin.name),
                         reason.unwrap_or("inherited item limit")
                     ),
-                    position,
+                    origin.position,
                 ));
             }
         }
         self.report.measurements.push(Measurement {
-            id: id.map(str::to_string),
+            name: origin.name.clone(),
+            path: origin.path.clone(),
+            id: origin.id.clone(),
             tokens,
             limit: cap,
             deferred: tokens.is_none(),
@@ -161,23 +171,26 @@ impl<C: TokenCounter> Analyzer<'_, C> {
         &mut self,
         nodes: &[Node],
         limits: &Limits,
-        id: Option<&str>,
-        position: Position,
+        origin: &ElementOrigin,
         inherited: Option<(u64, &str)>,
     ) -> Vec<Piece> {
         let mut pieces = Vec::new();
-        for node in nodes {
+        for (index, node) in nodes.iter().enumerate() {
             match node {
                 Node::Text { value } => extend(&mut pieces, vec![Piece::Text(value.clone())]),
-                Node::Section(s) => {
+                Node::Element(s) => {
                     let inherited = limits
                         .per_item
                         .map(|cap| (cap, limits.reason.as_deref().unwrap_or_default()));
                     let child = self.content(
                         &s.children,
                         &s.limits,
-                        s.id.as_deref(),
-                        s.position,
+                        &ElementOrigin {
+                            name: s.name.clone(),
+                            id: s.id.clone(),
+                            position: s.position,
+                            path: origin.path.iter().copied().chain([index]).collect(),
+                        },
                         inherited,
                     );
                     extend(&mut pieces, child);
@@ -208,7 +221,7 @@ impl<C: TokenCounter> Analyzer<'_, C> {
             }
             _ => (limits.max_tokens, limits.reason.as_deref()),
         };
-        self.measure(&pieces, cap, id, position, reason);
+        self.measure(&pieces, cap, origin, reason);
         pieces
     }
 }
@@ -228,12 +241,22 @@ pub fn lint(doc: &Document, counter: &impl TokenCounter) -> Report {
         bindings: None,
         report: Report::default(),
     };
-    analyzer.content(&doc.children, &doc.limits, None, doc.position, None);
+    analyzer.content(
+        &doc.children,
+        &doc.limits,
+        &ElementOrigin {
+            name: "htmlp".into(),
+            id: None,
+            position: doc.position,
+            path: Vec::new(),
+        },
+        None,
+    );
     analyzer.report
 }
 
 /// Validate static content, substitute inert strings, then check every final
-/// file and section budget. Variables have no separate limit. No output is
+/// file and element budget. Variables have no separate limit. No output is
 /// returned on any error.
 pub fn render(
     doc: &Document,
@@ -256,7 +279,17 @@ pub(crate) fn render_with_report(
         bindings: Some(bindings),
         report: Report::default(),
     };
-    let pieces = analyzer.content(&doc.children, &doc.limits, None, doc.position, None);
+    let pieces = analyzer.content(
+        &doc.children,
+        &doc.limits,
+        &ElementOrigin {
+            name: "htmlp".into(),
+            id: None,
+            position: doc.position,
+            path: Vec::new(),
+        },
+        None,
+    );
     if !analyzer.report.is_ok() {
         return Err(analyzer.report.diagnostics);
     }

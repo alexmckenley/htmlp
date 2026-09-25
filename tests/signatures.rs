@@ -72,7 +72,7 @@ fn signing_preserves_source_including_multiline_tags_and_self_closing_sections()
     let source = "<!-- keep -->\r\n<htmlp\r\n reason='A &amp; B.'\r\n max-tokens=\"1k\" sig='old'>\r\n# Hello 😀\r\n<section per-item='2' reason='Small.' />{{name}}\r\n<section sig='orphan' id='empty' />\r\n</htmlp>\r\n";
     let signed = sign_source(source).unwrap();
     let root_sig = parse(&signed).unwrap().limits.sig.unwrap();
-    let section_sig = parse(&signed).unwrap().sections()[0]
+    let section_sig = parse(&signed).unwrap().elements()[0]
         .limits
         .sig
         .clone()
@@ -101,17 +101,17 @@ impl TokenCounter for Cl100kLike {
 
 #[test]
 fn in_memory_signing_and_orphan_signatures() {
-    let mut section = Section::new("s", vec![]);
+    let mut section = Element::new("section").id("s");
     section.limits.per_item = Some(10);
     section.limits.reason = Some("Brief.".into());
-    let mut doc = Document::new(100, "Shared.", vec![Node::Section(section)]);
+    let mut doc = Document::new(100, "Shared.", vec![Node::Element(section)]);
     doc.sign();
     assert!(lint(&doc, &Cl100kLike).is_ok());
-    if let Node::Section(section) = &mut doc.children[0] {
+    if let Node::Element(section) = &mut doc.children[0] {
         section.limits.per_item = None;
     }
     assert_eq!(lint(&doc, &Cl100kLike).diagnostics[0].code, "signature");
     doc.sign();
-    assert!(doc.sections()[0].limits.sig.is_none());
+    assert!(doc.elements()[0].limits.sig.is_none());
     assert!(lint(&doc, &Cl100kLike).is_ok());
 }

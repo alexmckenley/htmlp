@@ -55,8 +55,8 @@ fn preserves_markdown_unicode_and_whitespace() {
         d.get_element_by_id("task").unwrap().to_string(),
         "# Task\né & < 😀"
     );
-    assert_eq!(d.sections().len(), 1);
-    assert_eq!(d.sections()[0].position.line, 2);
+    assert_eq!(d.elements().len(), 1);
+    assert_eq!(d.elements()[0].position.line, 2);
 }
 #[test]
 fn strict_syntax_rejects_browser_repair_and_xml_extensions() {
@@ -68,7 +68,7 @@ fn strict_syntax_rejects_browser_repair_and_xml_extensions() {
         "<?xml version='1.0'?><htmlp max-tokens='1k' reason='x'></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><section></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><SECTION></SECTION></htmlp>",
-        "<htmlp max-tokens='1k' reason='x'><div>x</div></htmlp>",
+        "<htmlp max-tokens='1k' reason='x'><ns:div>x</ns:div></htmlp>",
         "<htmlp max-tokens='1k' reason='x' other='x'></htmlp>",
         "<htmlp max-tokens='1k' reason='x' reason='y'></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><![CDATA[x]]></htmlp>",
@@ -76,7 +76,7 @@ fn strict_syntax_rejects_browser_repair_and_xml_extensions() {
         "<htmlp max-tokens='1k' reason='x'>&#128;</htmlp>",
         "<htmlp max-tokens='1k' reason='x'>a & b</htmlp>",
         "<htmlp max-tokens='1k' reason='x'><section id='x'></section><section id='x'></section></htmlp>",
-        "<htmlp max-tokens='1k' reason='x'><var id='x'> </var></htmlp>",
+        "<htmlp max-tokens='1k' reason='x'><var unknown='x'> </var></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><htmlp></htmlp></htmlp>",
         "<htmlp max-tokens='1k' reason='x' version='99'></htmlp>",
         "<htmlp max-tokens='1k' reason='x'>\0</htmlp>",
@@ -184,16 +184,16 @@ fn final_counts_are_not_assumed_additive() {
 }
 #[test]
 fn constructors_and_ids_are_typed_and_validated() {
-    let s = Section::new("system", vec![Node::text("Review.")]);
-    let mut d = Document::new(100, "Shared.", vec![Node::Section(s.clone())]);
+    let s = Element::new("section").id("system").text("Review.");
+    let mut d = Document::new(100, "Shared.", vec![Node::Element(s.clone())]);
     d.tokenizer = "scalar".into();
     d.sign();
     assert!(matches!(
         d.get_element_by_id("system"),
-        Some(ElementRef::Section(_))
+        Some(ElementRef::Element(_))
     ));
     assert!(lint(&d, &Scalars).is_ok());
-    d.children.push(Node::Section(s));
+    d.children.push(Node::Element(s));
     assert!(
         lint(&d, &Scalars)
             .diagnostics
@@ -259,7 +259,7 @@ fn json_roundtrips_the_typed_ast() {
     let json = serde_json::to_string(&d).unwrap();
     let copy: Document = serde_json::from_str(&json).unwrap();
     assert_eq!(d, copy);
-    assert!(json.contains("\"kind\":\"section\""));
+    assert!(json.contains("\"kind\":\"element\""));
 }
 
 #[test]
@@ -276,7 +276,7 @@ fn numeric_references_require_unsigned_digits() {
 #[test]
 fn unicode_positions_use_scalars_and_byte_offsets() {
     let source = "<htmlp max-tokens='1k' reason='Shared.'>é😀<section id='s'></section></htmlp>";
-    let section = parse(source).unwrap().sections()[0].position;
+    let section = parse(source).unwrap().elements()[0].position;
     let offset = source.find("<section").unwrap();
     assert_eq!(section.offset, offset);
     assert_eq!(section.column, source[..offset].chars().count() + 1);
@@ -284,13 +284,7 @@ fn unicode_positions_use_scalars_and_byte_offsets() {
 
 #[test]
 fn variables_only_accept_ids_and_static_counts_are_deferred() {
-    for source in [
-        "{{}}",
-        "{{ v }}",
-        "{{v",
-        "{{v max-tokens=1k}}",
-        "<var id='v' />",
-    ] {
+    for source in ["{{}}", "{{ v }}", "{{v", "{{v max-tokens=1k}}"] {
         assert!(
             parse(&format!(
                 "<htmlp max-tokens='1k' reason='Shared.'>{source}</htmlp>"
@@ -323,9 +317,9 @@ fn variables_only_accept_ids_and_static_counts_are_deferred() {
 fn self_closing_elements_keep_tree_structure_and_validation() {
     let d = document("<section id='empty' />{{v}}<section id='after'>End.</section>");
     assert_eq!(d.to_string(), "{{v}}End.");
-    assert_eq!(d.sections().len(), 2);
+    assert_eq!(d.elements().len(), 2);
     assert!(parse("<htmlp max-tokens='1k' reason='Shared.' />").is_ok());
-    assert!(parse("<htmlp max-tokens='1k' reason='Shared.'><var /></htmlp>").is_err());
+    assert!(parse("<htmlp max-tokens='1k' reason='Shared.'><var /></htmlp>").is_ok());
     assert!(
         parse("<htmlp max-tokens='1k' reason='Shared.'>{{v}}<section id='v' /></htmlp>").is_err()
     );

@@ -1,6 +1,6 @@
 [package]
 name = "htmlp"
-version = "0.2.0-alpha.4"
+version = "0.3.0-alpha.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Strict markup for prompt files with explicit token limits."
@@ -13,7 +13,6 @@ include = ["/src/**", "/examples/*.rs", "/examples/*.htmlp", "/Cargo.toml", "/Ca
 
 [features]
 default = []
-runtime = ["json"]
 json = ["dep:serde", "dep:serde_json"]
 tokens = ["dep:tiktoken-rs"]
 cli = ["json", "tokens"]
@@ -37,12 +36,8 @@ name = "schema"
 required-features = ["schema"]
 
 [[example]]
-name = "runtime_schema"
-required-features = ["schema", "runtime"]
-
-[[example]]
-name = "runtime"
-required-features = ["runtime", "tokens"]
+name = "composition"
+required-features = ["tokens"]
 
 [profile.release]
 opt-level = "z"

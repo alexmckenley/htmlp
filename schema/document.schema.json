@@ -45,7 +45,7 @@
           "minimum": 0
         },
         "per_item": {
-          "description": "Applies to each direct child section; does not change grandchildren.",
+          "description": "Applies to each direct child element; does not change grandchildren.",
           "type": [
             "integer",
             "null"
@@ -91,7 +91,7 @@
           ]
         },
         {
-          "description": "A semantic grouping. IDs have no provider-specific role or trust meaning.",
+          "description": "A named grouping. Names and optional IDs have no provider role or trust meaning.",
           "type": "object",
           "properties": {
             "children": {
@@ -108,10 +108,13 @@
             },
             "kind": {
               "type": "string",
-              "const": "section"
+              "const": "element"
             },
             "limits": {
               "$ref": "#/$defs/Limits"
+            },
+            "name": {
+              "type": "string"
             },
             "position": {
               "$ref": "#/$defs/Position"
@@ -120,6 +123,7 @@
           "additionalProperties": false,
           "required": [
             "kind",
+            "name",
             "limits",
             "children",
             "position"

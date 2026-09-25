@@ -10,37 +10,49 @@ pub struct TextMeasurement {
     pub tokens: u64,
 }
 
-/// A containing section, including unnamed sections and their source position.
+/// A containing element, including anonymous elements and their source position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "json", derive(serde::Serialize))]
-pub struct SectionOrigin {
+pub struct ElementOrigin {
+    pub name: String,
+    pub path: Vec<usize>,
     pub id: Option<String>,
     pub position: Position,
 }
 
-/// Non-overlapping UTF-8 byte span in the final text. Section ancestry preserves
+/// Non-overlapping UTF-8 byte span in the final text. Element ancestry preserves
 /// nesting without counting a parent's text a second time. Variables remain
-/// literal values and inherit their containing section's attribution.
+/// literal values and inherit their containing element's attribution.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "json", derive(serde::Serialize))]
 pub struct RenderedSpan {
     pub range: Range<usize>,
-    pub sections: Vec<SectionOrigin>,
+    pub elements: Vec<ElementOrigin>,
     pub variable: Option<String>,
+}
+
+/// One element's rendered range, including empty and anonymous elements.
+/// These ranges may overlap; use spans for a non-overlapping partition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json", derive(serde::Serialize))]
+pub struct RenderedElement {
+    pub origin: ElementOrigin,
+    pub range: Range<usize>,
 }
 
 /// Immutable output of a complete successful validation. No constructor or
 /// deserializer can fabricate checked output. Extracted text is ordinary text;
 /// modifying it does not preserve this object's validation guarantee.
 #[derive(Debug, Clone)]
-pub struct RenderedPrompt {
+pub struct RenderedDocument {
     text: String,
     measurement: TextMeasurement,
     report: Report,
     spans: Vec<RenderedSpan>,
-    sections: BTreeMap<String, Range<usize>>,
+    by_id: BTreeMap<String, Range<usize>>,
+    elements: Vec<RenderedElement>,
 }
-impl RenderedPrompt {
+impl RenderedDocument {
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -54,9 +66,19 @@ impl RenderedPrompt {
         &self.spans
     }
     /// Select from an already checked whole document. Ancestor and sibling
-    /// budgets were validated before any section became available.
-    pub fn section(&self, id: &str) -> Option<&str> {
-        self.sections.get(id).map(|range| &self.text[range.clone()])
+    /// budgets were validated before any element became available.
+    pub fn element(&self, id: &str) -> Option<&str> {
+        self.by_id.get(id).map(|range| &self.text[range.clone()])
+    }
+    pub fn elements(&self) -> &[RenderedElement] {
+        &self.elements
+    }
+    pub fn elements_by_name(&self, name: &str) -> Vec<&str> {
+        self.elements
+            .iter()
+            .filter(|e| e.origin.name == name)
+            .map(|e| &self.text[e.range.clone()])
+            .collect()
     }
     pub fn into_text(self) -> String {
         self.text
@@ -64,14 +86,14 @@ impl RenderedPrompt {
 }
 
 /// Bind and validate the entire document, returning immutable text, exact
-/// tokenizer measurement, budget report, and non-overlapping section provenance.
+/// tokenizer measurement, budget report, and non-overlapping element provenance.
 pub fn render_checked(
     doc: &Document,
     bindings: &Bindings,
     counter: &impl TokenCounter,
-) -> Result<RenderedPrompt, Vec<Diagnostic>> {
+) -> Result<RenderedDocument, Vec<Diagnostic>> {
     let (text, report) = crate::check::render_with_report(doc, bindings, counter)?;
-    let mut output = RenderedPrompt {
+    let mut output = RenderedDocument {
         measurement: TextMeasurement {
             tokenizer: counter.name().into(),
             tokens: report
@@ -83,27 +105,40 @@ pub fn render_checked(
         text,
         report,
         spans: Vec::new(),
-        sections: BTreeMap::new(),
+        by_id: BTreeMap::new(),
+        elements: Vec::new(),
     };
     fn walk(
         nodes: &[Node],
         bindings: &Bindings,
-        ancestry: &mut Vec<SectionOrigin>,
+        ancestry: &mut Vec<ElementOrigin>,
+        path: &mut Vec<usize>,
         offset: &mut usize,
-        out: &mut RenderedPrompt,
+        out: &mut RenderedDocument,
     ) {
-        for node in nodes {
+        for (index, node) in nodes.iter().enumerate() {
             let (length, variable) = match node {
-                Node::Section(section) => {
+                Node::Element(section) => {
                     let start = *offset;
-                    ancestry.push(SectionOrigin {
+                    path.push(index);
+                    let origin = ElementOrigin {
+                        name: section.name.clone(),
                         id: section.id.clone(),
                         position: section.position,
+                        path: path.clone(),
+                    };
+                    let item = out.elements.len();
+                    out.elements.push(RenderedElement {
+                        origin: origin.clone(),
+                        range: start..start,
                     });
-                    walk(&section.children, bindings, ancestry, offset, out);
+                    ancestry.push(origin);
+                    walk(&section.children, bindings, ancestry, path, offset, out);
                     ancestry.pop();
+                    path.pop();
+                    out.elements[item].range.end = *offset;
                     if let Some(id) = &section.id {
-                        out.sections.insert(id.clone(), start..*offset);
+                        out.by_id.insert(id.clone(), start..*offset);
                     }
                     continue;
                 }
@@ -115,7 +150,7 @@ pub fn render_checked(
             if length > 0 {
                 out.spans.push(RenderedSpan {
                     range: *offset..*offset + length,
-                    sections: ancestry.clone(),
+                    elements: ancestry.clone(),
                     variable,
                 });
             }
@@ -125,6 +160,7 @@ pub fn render_checked(
     walk(
         &doc.children,
         bindings,
+        &mut Vec::new(),
         &mut Vec::new(),
         &mut 0,
         &mut output,

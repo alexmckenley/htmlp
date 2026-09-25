@@ -4,41 +4,42 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Documentation — HTMLP</title>
-<meta name="description" content="HTMLP prompt files, typed Rust requests, checked rendering, and runtime token accounting.">
+<meta name="description" content="HTMLP prompt files: author-chosen elements, signed token budgets, variables, checked rendering, and the matching Rust API.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
 <body>
-<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/" aria-current="page">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/" aria-current="page">Documentation</a><a href="{{BASE}}/docs/rust/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
 <h1>Documentation</h1>
-<p>HTMLP provides a prompt file format and a Rust interface for typed requests and usage accounting. Use either independently, or render checked files into attributed requests.</p>
+<p>HTMLP is a prompt file format and a matching Rust API. Both build the same thing: elements with author-chosen names, optional ids, and token budgets that must be justified and signed.</p>
 <ul>
-<li><a href="#files">Prompt files</a>: sections, token budgets, reasons, signatures, and variables.</li>
-<li><a href="{{BASE}}/docs/runtime/">Rust interface</a>: attributed fragments, tools, checked rendering, and token usage.</li>
+<li><a href="#files">Prompt files</a>: elements, token budgets, reasons, signatures, and variables.</li>
+<li><a href="{{BASE}}/docs/rust/">Rust interface</a>: the <code>Element</code> builder, interpolation, checked rendering, and provenance.</li>
 <li><a href="{{BASE}}/api/htmlp/index.html">API reference</a>: generated directly from the current Rust source.</li>
 </ul>
 <h2>Install</h2>
-<p>Version <code>0.2.0-alpha.4</code> is distributed through GitHub, not crates.io. For the command-line checker:</p>
-<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli</code></pre>
-<p>For typed requests, add this Cargo dependency; add <code>tokens</code> to use the built-in tokenizer:</p>
+<p>Version <code>0.3.0-alpha.1</code> is distributed through GitHub, not crates.io. For the command-line checker:</p>
+<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.3.0-alpha.1 --features cli</code></pre>
+<p>For the library, add this Cargo dependency; add <code>tokens</code> to use the built-in tokenizer:</p>
 <pre><code>[dependencies]
-htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }</code></pre>
+htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.3.0-alpha.1" }</code></pre>
 <h2 id="files">Prompt files</h2>
-<p>HTMLP 0.2 uses two elements: <code>htmlp</code> and <code>section</code>, plus <code>{{name}}</code> string placeholders. Content is literal Markdown. All declared limits require a nonblank <code>reason</code>.</p>
-<h2>Files and sections</h2>
+<p>A file has one <code>htmlp</code> root. Every other element name is yours: lowercase ASCII letters, digits, and hyphens, starting with a letter. Text is literal Markdown, <code>{{name}}</code> inserts a string, and all declared limits require a nonblank <code>reason</code>.</p>
+<h2>Files and elements</h2>
 <pre><code>&lt;htmlp max-tokens="2k" reason="Shared context."&gt;
-&lt;section id="system" max-tokens="500" reason="Loaded on every request."&gt;
+&lt;system-prompt id="base" max-tokens="500" reason="Loaded on every request."&gt;
 Make one change. Run its tests.
-&lt;/section&gt;
+&lt;/system-prompt&gt;
 &lt;/htmlp&gt;</code></pre>
-<p>The root limit covers the entire rendered text. A section limit covers all its descendants. Tags, attributes, and comments do not count. Whitespace inside the root does count; indentation is preserved.</p>
+<p>The root limit covers the entire rendered text. An element limit covers all its descendants. Tags, attributes, and comments do not count. Whitespace inside the root does count; indentation is preserved.</p>
+<p>Names are open; the attribute set is closed. <code>system-prompt</code> and <code>section</code> are validated identically, and an unknown attribute is an error on either. The name is the element's kind and the optional <code>id</code> is its identity, so several elements can share a name and be selected together. Neither assigns a provider role or trust level.</p>
 <p><code>1k</code> is 1,000 tokens; <code>1.5k</code> is 1,500. Counts use <code>cl100k_base</code> by default. Token counts depend on the tokenizer; this is not a universal model limit. The Rust API accepts a custom <code>TokenCounter</code>.</p>
 <h2>Limit each item</h2>
-<pre><code>&lt;section id="checks" max-tokens="10k" per-item="1k" reason="Keep checks concise."&gt;
-&lt;section id="test"&gt;Run the affected tests.&lt;/section&gt;
-&lt;section id="commit"&gt;Explain the change.&lt;/section&gt;
-&lt;/section&gt;</code></pre>
-<p>Place this section inside an <code>htmlp</code> root. The total is capped at 10,000 tokens; each item at 1,000. <code>per-item</code> applies to each direct child section. The smaller of that cap and the child's own cap wins. One reason explains the limits declared on that element.</p>
+<pre><code>&lt;checks max-tokens="10k" per-item="1k" reason="Keep checks concise."&gt;
+&lt;check id="test"&gt;Run the affected tests.&lt;/check&gt;
+&lt;check id="commit"&gt;Explain the change.&lt;/check&gt;
+&lt;/checks&gt;</code></pre>
+<p>Place this element inside an <code>htmlp</code> root. The total is capped at 10,000 tokens; each item at 1,000. <code>per-item</code> applies to each direct child element. The smaller of that cap and the child's own cap wins. One reason explains the limits declared on that element.</p>
 <h2>Sign budgets</h2>
 <p>Run <code>htmlp sign ./prompts</code> after authoring. Each declared budget gets a short <code>sig</code> covering <code>max-tokens</code>, <code>per-item</code>, and <code>reason</code>. Checking rejects missing or stale signatures and asks you to rerun <code>htmlp sign</code> for intentional changes. Content edits need no re-signing.</p>
 <p>Review changes before signing; run only <code>check</code> in CI. The checksum is not approval: anyone can re-sign with the same reason or remove a constraint.</p>
@@ -46,7 +47,7 @@ Make one change. Run its tests.
 <pre><code>&lt;htmlp max-tokens="1k" reason="Request context."&gt;
 Answer: {{question}}
 &lt;/htmlp&gt;</code></pre>
-<p>Variables have no limits or attributes. Static checks defer counts for sections containing variables. Rendering requires every referenced string binding and enforces file and section limits on the final text. Repeated names reuse the same binding; values are inserted literally.</p>
+<p>Variables have no limits or attributes. Static checks defer counts for elements containing variables. Rendering requires every referenced string binding and enforces file and element limits on the final text. Repeated names reuse the same binding; values are inserted literally.</p>
 <pre><code>htmlp sign request.htmlp
 htmlp render request.htmlp --vars values.json</code></pre>
 <p>Write <code>&amp;#123;&amp;#123;name}}</code> for a literal <code>{{name}}</code>. JSON measurements use <code>tokens: null</code> and <code>deferred: true</code> until rendering.</p>
@@ -61,38 +62,40 @@ htmlp compile rules.htmlp     # static budgets checked; variables deferred
 htmlp render rules.htmlp      # checked prompt text</code></pre>
 <p>No ancestor rules or external configuration are loaded. Scans skip symlinks and <code>.git</code>, <code>node_modules</code>, <code>target</code>, <code>dist</code>, and <code>vendor</code>. A path with no matching files fails.</p>
 <h2>Rust and other languages</h2>
-<p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Section</code>, and <code>Variable</code> values. Construct nodes in memory with <code>Document::new</code>, <code>Section::new</code>, and <code>Node::text</code>. Call <code>Document::sign()</code> to accept in-memory budgets, then <code>lint</code> before use. <code>sign_source</code> preserves file formatting.</p>
-<p><code>get_element_by_id</code> returns a typed reference. <code>sections()</code> returns direct child sections. <code>to_string()</code> extracts text with visible <code>{{name}}</code> placeholders; use <code>render</code> for checked substitutions. IDs such as <code>system</code> are labels, not SDK roles.</p>
+<p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Element</code>, and <code>Variable</code> values. Build the same tree in memory with <code>Document::new</code> and the <code>Element</code> builder: <code>new</code>, <code>id</code>, <code>text</code>, <code>variable</code>, <code>template</code>, <code>element</code>, <code>max_tokens</code>, and <code>per_item</code>. Call <code>Document::sign()</code> to accept in-memory budgets, then <code>lint</code> before use. <code>sign_source</code> preserves file formatting.</p>
+<p><code>template</code> and <code>parse_template</code> parse <code>{{name}}</code> through the same code path as markup text, so an in-memory document produces the same nodes as its parsed equivalent and renders identically, differing only in source positions; <code>text</code> appends literal content instead.</p>
+<p><code>get_element_by_id</code> returns a typed reference. <code>elements()</code> returns direct child elements and <code>elements_by_name(name)</code> searches descendants. <code>to_string()</code> extracts text with visible <code>{{name}}</code> placeholders; use <code>Document::render</code> for checked substitutions. A name such as <code>system-prompt</code> is a label, not an SDK role.</p>
 <p>Other languages can invoke the CLI and consume JSON. Native bindings and build-tool plugins are not included in this alpha.</p>
-<h2>Runtime prompts</h2>
-<p>Enable the Rust <code>runtime</code> feature for attributed <code>PromptFragment</code>s, typed text/image/tool content, and <code>ModelRequest</code>s. Every fragment requires a source category and role. <code>request.estimate()</code> provides categorized byte-based estimates with an explicit image reserve; <code>TokenUsage</code> keeps provider-reported usage separate. Missing attribution is <code>None</code>, not zero.</p>
-<p><code>render_checked</code> returns immutable text, its tokenizer measurement, and non-overlapping spans with section ancestry. <code>section(id)</code> selects from a fully checked document; <code>PromptFragment::checked</code> bridges it into a request. Category attributes are not yet supported in markup.</p>
-<p><a href="{{BASE}}/docs/runtime/">Rust interface guide and examples</a> · <a href="{{BASE}}/runtime.md">Plain Markdown reference</a></p>
+<h2>Checked rendering</h2>
+<p><code>Document::render(&amp;bindings, &amp;counter)</code> returns an immutable <code>RenderedDocument</code> only after the whole document validates: element names, unique ids, budget signatures, every binding, and every root, element, and per-item budget. Nothing can fabricate checked output, and failure returns diagnostics instead of partial text.</p>
+<p>It exposes <code>text()</code>, a tokenizer <code>measurement()</code>, <code>element(id)</code> and <code>elements_by_name(name)</code>, per-element ranges, and non-overlapping <code>spans()</code> with element ancestry. Each <code>ElementOrigin</code> carries a name, a path of child indices from the root, an optional id, and a source position, so anonymous elements stay identifiable. Budget measurements include descendants; do not sum a parent and its children.</p>
+<h2>Structure here, meaning in your types</h2>
+<p>HTMLP assigns no roles, message kinds, or trust levels, and no markup attribute selects one. Applications that need those distinctions define them in their own type system and pair them with checked output: HTMLP proves the text is within budget, and your types prove it is attributed.</p>
+<p>0.2 shipped an optional <code>runtime</code> feature with typed model requests, roles, and content-source categories. That encoded one harness's vocabulary as a public contract, and 0.3 removes it. Move those types into your own crate and keep using <code>Document::render</code> as the bridge.</p>
+<p><a href="{{BASE}}/docs/rust/">Rust interface guide and examples</a> · <a href="{{BASE}}/rust.md">Plain Markdown reference</a></p>
 <h2 id="features">Library features</h2>
 <table>
 <thead><tr><th>Feature</th><th>Enables</th></tr></thead>
 <tbody>
 <tr><td>Default</td><td>Typed nodes, parsing, signing, linting, and rendering with a supplied <code>TokenCounter</code>.</td></tr>
-<tr><td><code>runtime</code></td><td>Typed requests, attribution, estimates, and reported usage. Includes JSON support; no provider SDK or tokenizer tables.</td></tr>
 <tr><td><code>tokens</code></td><td>Embedded <code>Cl100k</code> tokenizer.</td></tr>
-<tr><td><code>json</code></td><td>JSON serialization for document types.</td></tr>
-<tr><td><code>schema</code></td><td>JSON Schema generation; includes <code>json</code>. Add <code>runtime</code> for request and usage schemas.</td></tr>
+<tr><td><code>json</code></td><td>JSON serialization for document types, measurements, and rendered provenance.</td></tr>
+<tr><td><code>schema</code></td><td>Document JSON Schema generation; includes <code>json</code>.</td></tr>
 <tr><td><code>cli</code></td><td>Command-line binary; includes <code>json</code> and <code>tokens</code>.</td></tr>
 </tbody>
 </table>
 <h2>Strict markup</h2>
-<p>Use lowercase tags, quoted attributes, and unique section IDs. Empty elements can self-close: <code>&lt;section id="notes" /&gt;</code>. Otherwise use matching closing tags. Escape literal <code>&lt;</code> as <code>&amp;lt;</code> and <code>&amp;</code> as <code>&amp;amp;</code>, including inside Markdown code fences. Unknown elements and attributes fail. No browser error recovery is performed. Self-closing non-void elements follow XML rules, so ordinary HTML parsing is not equivalent.</p>
+<p>Use lowercase tags, quoted attributes, and unique IDs. Empty elements can self-close: <code>&lt;notes id="scratch" /&gt;</code>. Otherwise use matching closing tags. Escape literal <code>&lt;</code> as <code>&amp;lt;</code> and <code>&amp;</code> as <code>&amp;amp;</code>, including inside Markdown code fences. Invalid element names and unknown attributes fail. No browser error recovery is performed. Self-closing non-void elements follow XML rules, so ordinary HTML parsing is not equivalent.</p>
 <p>Limits and reasons are editable source. Require review or CI policy to protect changes to budgets. A reason explains a constraint; it cannot prevent an agent from changing it.</p>
 <h2>Reference</h2>
 <ul>
 <li><a href="{{BASE}}/api/htmlp/index.html">Generated Rust API</a></li>
 <li><a href="{{BASE}}/document.schema.json">Generated document JSON Schema</a></li>
-<li><a href="{{BASE}}/request.schema.json">Generated request JSON Schema</a></li>
-<li><a href="{{BASE}}/usage.schema.json">Generated usage JSON Schema</a></li>
 <li><a href="{{BASE}}/spec.md">Format specification</a></li>
+<li><a href="{{BASE}}/rust.md">Rust interface reference</a></li>
 <li><a href="https://github.com/alexmckenley/htmlp/blob/main/CONTRIBUTING.md">Development and editor setup</a></li>
 </ul>
 </main>
-<footer>HTMLP 0.2 · Alpha · <a href="{{BASE}}/">Home</a></footer>
+<footer>HTMLP 0.3 · Alpha · <a href="{{BASE}}/">Home</a></footer>
 </body>
 </html>

@@ -1,18 +1,18 @@
-# HTMLP 0.2 specification
+# HTMLP 0.3 specification
 
 Status: experimental alpha. Extension: `.htmlp`. Encoding: UTF-8.
 
 ## Grammar
 
-A file contains exactly one `htmlp` root. Surrounding whitespace and comments are allowed. Root and section children are text, sections, or variables. Nesting is limited to 64 elements, counting the root. Sources are limited to 4 MiB of UTF-8 bytes before parsing.
+A file contains exactly one `htmlp` root. Surrounding whitespace and comments are allowed. Root and element children are text, elements, or variables. Nesting is limited to 64 elements, counting the root. Sources are limited to 4 MiB of UTF-8 bytes before parsing.
 
 ```html
 <htmlp max-tokens="1k" reason="Shared context.">
-<section id="workflow">Make one change. Test it.</section>
+<workflow id="routine">Make one change. Test it.</workflow>
 </htmlp>
 ```
 
-Only lowercase `htmlp` and `section` elements are recognized. Start and end tags must match exactly; empty elements may self-close, such as `<section id="notes" />`. Attributes must be quoted, unique, and in the allowed set. Namespaces, processing instructions, XML declarations, DOCTYPE, and CDATA are errors. No browser repair or external resource resolution occurs.
+Element names are author-chosen. A name must start with a lowercase ASCII letter and contain only lowercase ASCII letters, digits, and hyphens; `htmlp` is reserved for the root. A name is a label: it carries no provider role, message kind, or trust meaning, and the library defines no vocabulary of its own. Start and end tags must match exactly; empty elements may self-close, such as `<notes id="scratch" />`. Attributes must be quoted, unique, and in the allowed set. Namespaces, processing instructions, XML declarations, DOCTYPE, and CDATA are errors. No browser repair or external resource resolution occurs.
 
 This is HTML-inspired markup with strict XML-style lexical rules, not arbitrary HTML or a complete HTML document. A general HTML parser cannot replace its validator; in particular, browser HTML does not honor self-closing syntax on non-void elements. Markdown is literal text; indentation is not dedented and fenced code does not disable markup parsing. Escape literal `<` and `&`.
 
@@ -21,17 +21,17 @@ This is HTML-inspired markup with strict XML-style lexical rules, not arbitrary 
 | Element | Required | Optional |
 | --- | --- | --- |
 | `htmlp` | `max-tokens`, `reason` | `version`, `tokenizer`, `per-item`, `sig` |
-| `section` | none | `id`, `max-tokens`, `per-item`, `reason`, `sig` |
+| any other name | none | `id`, `max-tokens`, `per-item`, `reason`, `sig` |
 
-`version` defaults to `0.2`; other versions fail. `tokenizer` defaults to `cl100k_base`. The library permits other identifiers, but linting requires an exactly matching `TokenCounter::name()`. The CLI supports only `cl100k_base`.
+Names are open; the attribute set is closed. An unknown attribute on any element is an error, so a new name never introduces new behavior. `version` defaults to `0.3`; other versions fail. `tokenizer` defaults to `cl100k_base`. The library permits other identifiers, but linting requires an exactly matching `TokenCounter::name()`. The CLI supports only `cl100k_base`.
 
 A `reason` must contain non-whitespace text whenever either token limit is declared on an element. A single reason explains both limits if both are present. Reasons need not repeat on children that merely inherit a direct-item cap. A reason is excluded from prompt text and appears with budget diagnostics and measurements.
 
-Section IDs must be unique and contain one or more ASCII letters, digits, `_`, `-`, `.`, or `:`. IDs have no role or trust semantics. For example, `id="system"` is a label your SDK adapter may choose to interpret.
+IDs are optional and must be unique within a file. An ID contains one or more ASCII letters, digits, `_`, `-`, `.`, or `:`; its character set is deliberately wider than an element name's. The name is the element's kind and the ID is its identity: several elements may share a name, and `elements_by_name` selects them together. IDs have no role or trust semantics. For example, `<system-prompt id="base">` is a pair of labels an adapter may choose to interpret; HTMLP itself derives nothing from either.
 
 ## Variables
 
-Write `{{name}}` in text to insert a string binding. Names use the same characters as section IDs, with no surrounding whitespace. Repeated references reuse the same binding, but variable names cannot collide with section IDs. Placeholders have no attributes, token limits, or reasons; these fields are also absent from the Rust `Variable` type and rejected by JSON deserialization. The old `var` element is not supported.
+Write `{{name}}` in text to insert a string binding. Names use the same characters as element IDs, with no surrounding whitespace. Repeated references reuse the same binding, but variable names cannot collide with element IDs. Placeholders have no attributes, token limits, or reasons; these fields are also absent from the Rust `Variable` type and rejected by JSON deserialization. The old `var` element is not supported.
 
 Placeholders are recognized in raw text, including Markdown code fences, before entity decoding. Write `&#123;&#123;name}}` for literal `{{name}}`. Placeholders are not expanded in attributes or comments and cannot span markup or comments. An opening `{{` without a closing `}}`, an empty name, or an invalid name is an error. Closing braces without an opening placeholder remain literal text, allowing ordinary JSON.
 
@@ -41,13 +41,13 @@ Every referenced name needs a string binding at render time. Extra bindings are 
 
 Unsigned decimal integers denote tokens. A `k` or `K` suffix multiplies by 1,000 and permits up to three fractional digits: `1k`, `1.5k`, `0.001k`. No signs, whitespace, exponent notation, unitless fractions, empty fraction, or fractional tokens are accepted. Values must fit in `u64`. Zero and leading zeros are allowed.
 
-`max-tokens` bounds the whole rendered subtree. The root limit is mandatory. `per-item` caps each direct child **section**, including that child's full subtree. It does not cap text or variables individually and does not propagate to grandchildren. A child can declare its own item limit. The smaller of the child's own total cap and the parent's item cap wins. For ties the child's own reason is reported.
+`max-tokens` bounds the whole rendered subtree. The root limit is mandatory. `per-item` caps each direct child **element**, including that child's full subtree. It does not cap text or variables individually and does not propagate to grandchildren. A child can declare its own item limit. The smaller of the child's own total cap and the parent's item cap wins. For ties the child's own reason is reported.
 
 Each file is checked independently. There is no external configuration, ancestor inheritance, implicit directory-context aggregation, or automatic agent loading. Inline policies and reasons remain editable source; repository review and protected CI must govern policy changes if needed.
 
 ## Budget signatures
 
-Every element declaring `max-tokens` or `per-item` requires a matching `sig` at check, compile, and render time. Unsigned source may be authored and parsed; `sign` generates the attribute. A signature on an element without a local limit is an error. Signatures cover only the two local limits and their reason, not prompt content, IDs, tokenizer, hierarchy, inherited limits, or author identity. Variables have no signatures.
+Every element declaring `max-tokens` or `per-item` requires a matching `sig` at check, compile, and render time. Unsigned source may be authored and parsed; `sign` generates the attribute. A signature on an element without a local limit is an error. Signatures cover only the two local limits and their reason, not prompt content, element names, IDs, tokenizer, hierarchy, inherited limits, or author identity. Variables have no signatures.
 
 The canonical byte sequence is:
 
@@ -69,25 +69,27 @@ Supported entities are `amp`, `lt`, `gt`, `quot`, `apos`, decimal numeric refere
 
 Token counters count ordinary text, including special-token-looking strings, without adding protocol markers. No heuristic character-to-token conversion is used. The CLI uses the embedded `cl100k_base` encoding from tiktoken-rs. Counts apply to this encoding only, and exclude provider message framing, tools, or SDK overhead.
 
-Static checking merges adjacent literal text across section boundaries before tokenization. A subtree containing any unresolved variable has no known token count: its measurement is `tokens: null`, `deferred: true`. No per-variable allowance or partial token estimate is used. Other, fully static subtrees still have their budgets checked. A successful static check therefore does not certify variable-dependent budgets.
+Static checking merges adjacent literal text across element boundaries before tokenization. A subtree containing any unresolved variable has no known token count: its measurement is `tokens: null`, `deferred: true`. No per-variable allowance or partial token estimate is used. Other, fully static subtrees still have their budgets checked. A successful static check therefore does not certify variable-dependent budgets.
 
-Rendering requires every binding, substitutes literal values, and tokenizes every complete rendered subtree. File, section, and direct-item budgets are enforced against this final text; variables have no separate cap. No output is returned on failure. This also handles tokenization changes at interpolation boundaries, where counts are not additive.
+Rendering requires every binding, substitutes literal values, and tokenizes every complete rendered subtree. File, element, and direct-item budgets are enforced against this final text; variables have no separate cap. No output is returned on failure. This also handles tokenization changes at interpolation boundaries, where counts are not additive.
 
 ## Typed API and JSON
 
-`Document` contains a version, tokenizer identifier, `Limits`, `Vec<Node>`, and source position. `Node` is the enum `Text`, `Section`, or `Variable`. `Section` contains an optional ID, limits, children, and position. `Variable` contains only an ID and source position. Constructors can build the same structure without a source file; `Document::sign()` explicitly accepts its budgets; `lint` validates that structure and its signatures too.
+`Document` contains a version, tokenizer identifier, `Limits`, `Vec<Node>`, and source position. `Node` is the enum `Text`, `Element`, or `Variable`. `Element` contains a name, an optional ID, limits, children, and position. `Variable` contains only an ID and source position. Constructors build the same structure without a source file: `Element::new(name)` with `.id`, `.text`, `.variable`, `.template`, `.element`, `.max_tokens`, and `.per_item`. `parse_template(source)` parses `{{name}}` interpolation into the same nodes the markup text path produces; an equivalent in-memory document differs from a parsed one only in source positions. `Document::sign()` explicitly accepts its budgets; `lint` validates that structure, its element names, and its signatures too.
 
-`get_element_by_id` searches descendants and returns `ElementRef`, a section or variable reference (the first occurrence for repeated variable names). `sections()` returns direct child sections in source order. `to_string()` extracts text without validation and represents unbound variables as `{{id}}`; it is neither source serialization nor a checked rendered prompt.
+`get_element_by_id` searches descendants and returns `ElementRef`, an element or variable reference (the first occurrence for repeated variable names). `elements()` returns direct child elements in source order; `elements_by_name(name)` returns every descendant with that name. `to_string()` extracts text without validation and represents unbound variables as `{{id}}`; it is neither source serialization nor a checked rendered prompt.
 
 The optional `json` feature serializes node variants with a lowercase `kind` discriminator. Sizes are expanded integers. JavaScript consumers need a lossless JSON integer reader for values above `Number.MAX_SAFE_INTEGER`. Source positions use one-based Unicode-scalar line/column and a zero-based UTF-8 byte offset. Zero line/column represents an unavailable location or an in-memory node. The generated [JSON Schema](https://htmlp.dev/document.schema.json) describes data shape; semantic invariants still require `lint`.
 
 The `schema` feature generates the document schema from these Rust types. `cargo doc` generates their API reference. Diagnostic codes and JSON fields are experimental in this alpha.
 
-## Runtime API
+## Checked rendering
 
-The optional `runtime` feature provides mandatory source attribution, typed model requests, heuristic request estimates, and provider-reported usage. It does not add markup elements or attributes. See the [runtime guide](runtime.md).
+`Document::render`, equivalently the free function `render_checked`, returns an immutable `RenderedDocument` only after the whole document validates. It exposes the final text, its tokenizer measurement, a full budget report, per-element ranges, and non-overlapping spans with element ancestry. No constructor or deserializer can fabricate checked output, and failure returns diagnostics instead of partial text.
 
-`render_checked` returns immutable text, its tokenizer measurement, a full budget report, and non-overlapping spans with section ancestry. Named sections can be selected only after validating the whole document. Budget measurements overlap; category accounting must not sum parent and child measurements.
+`ElementOrigin` records an element's name, its `path` of child indices from the root, its optional ID, and its source position, so anonymous elements remain identifiable and repeated names stay distinct. `element(id)` and `elements_by_name(name)` select text only after validation, so selection cannot bypass an ancestor's constraint. Per-element ranges nest and may overlap; `spans()` partitions the text exactly once. Budget measurements include descendants, so category accounting must not sum parent and child measurements.
+
+HTMLP assigns no roles, message kinds, or trust levels, and adds no markup attribute for them. An application that needs those distinctions defines them in its own types and pairs them with checked output. See the [Rust guide](rust.md).
 
 ## CLI
 

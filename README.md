@@ -1,27 +1,27 @@
 # HTMLP
 
-Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.
+Statically enforceable token limits for context files.
 
-Keep shared instructions within a defined budget. Put a limit and its reason beside the content; check every file before it reaches an agent.
+Agents write their own skills. Context fills with slop. Prompts grow unbounded. HTMLP enforces a token budget, pushing agents to decide what belongs, what to cut, and when a larger budget needs justification.
 
-Use the file format, the Rust runtime types, or both. [Prompt file guide](https://htmlp.dev/docs/) · [Rust interface guide](https://htmlp.dev/docs/runtime/).
+Put a limit and its reason beside the content; check every file before it reaches an agent. [Prompt file guide](https://htmlp.dev/docs/) · [Rust interface guide](https://htmlp.dev/docs/rust/).
 
 ```html
 <htmlp max-tokens="2k" reason="Loaded on every request.">
-<section id="workflow" max-tokens="500" reason="Keep routine steps short.">
+<workflow id="routine" max-tokens="500" reason="Keep routine steps short.">
 Read the code. Make one change. Run its tests.
-</section>
+</workflow>
 </htmlp>
 ```
 
-Save as `rules.htmlp`. `2k` means 2,000 tokens. Every declared limit requires a nonblank `reason`.
+Save as `rules.htmlp`. `2k` means 2,000 tokens. Every declared limit requires a nonblank `reason`. Element names are yours to choose; HTMLP validates structure and budgets, not meaning.
 
 ## Install and check
 
 Requires a Rust toolchain. This alpha is distributed through GitHub; it is not published to crates.io.
 
 ```sh
-cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
+cargo install --git https://github.com/alexmckenley/htmlp --tag v0.3.0-alpha.1 --features cli
 htmlp sign ./prompts
 htmlp check ./prompts
 ```
@@ -52,12 +52,14 @@ Review budget changes before re-signing; run only `check` in CI. Signatures are 
 ## Format
 
 - `<htmlp>` is the single root; `max-tokens` and `reason` are required.
-- `<section>` groups Markdown. Optional `id` supports lookup. Optional `max-tokens` bounds its full text, including descendants.
-- `per-item` on a root or section caps each direct child section. For example, `max-tokens="10k" per-item="1k" reason="Keep checks concise."` caps the total at 10,000 tokens and each item at 1,000. A child's own smaller limit still applies.
+- Every other element name is author-chosen: lowercase ASCII letters, digits, and hyphens, starting with a letter. `<workflow>`, `<system-prompt>`, and `<section>` are all valid and all validated identically.
+- Optional `id` supports lookup and must be unique. The name is the element's kind; the ID is its identity. Neither assigns a provider role or trust level.
+- Optional `max-tokens` bounds an element's full text, including descendants.
+- `per-item` on any element caps each direct child element. For example, `max-tokens="10k" per-item="1k" reason="Keep checks concise."` caps the total at 10,000 tokens and each item at 1,000. A child's own smaller limit still applies.
 - `{{question}}` inserts a named string value. Variables have no limits or attributes; repeated names reuse the same binding.
 - One `reason` explains the limits declared on that element. Reasons are metadata, excluded from rendered text.
 
-Tags are lowercase with quoted attributes. Use matching end tags, or self-close an empty element: `<section id="notes" />`. Escape literal `<` and `&`, even in Markdown fences. Write `&#123;&#123;name}}` to keep a literal `{{name}}`. Whitespace is preserved. Unknown syntax fails instead of being repaired like browser HTML.
+Names are open; the attribute set is closed. Tags are lowercase with quoted attributes, and an unknown attribute is an error anywhere. Use matching end tags, or self-close an empty element: `<notes id="scratch" />`. Escape literal `<` and `&`, even in Markdown fences. Write `&#123;&#123;name}}` to keep a literal `{{name}}`. Whitespace is preserved. Unknown syntax fails instead of being repaired like browser HTML.
 
 Budgets count rendered text with `cl100k_base`, not characters or guessed tokens. The encoding can differ from your model's tokenizer. Static checks defer budgets for subtrees containing variables; `render` checks their final text after substitution. Deferred measurements have `tokens: null` and `deferred: true`. Limits do not include SDK role wrappers or other provider overhead.
 
@@ -65,50 +67,45 @@ Budgets count rendered text with `cl100k_base`, not characters or guessed tokens
 
 The default library uses the allocation-free `xmlparser` tokenizer and RustCrypto `sha2` for budget checksums. HTMLP itself allocates its owned AST. JSON, schema generation, and embedded tokenization are optional features. The CLI includes exact tokenization and consequently vocabulary data.
 
-```rust
-use htmlp::{Document, Node, Section};
+Markup and Rust build the same tree. `Element` is the primitive in both.
 
-let mut document = Document::new(1000, "Shared context.", vec![
-    Node::Section(Section::new("system", vec![Node::text("Review the change.")])),
-]);
+```rust
+use htmlp::{Document, Element};
+
+let workflow = Element::new("workflow")
+    .id("routine")
+    .max_tokens(500, "Keep routine steps short.")
+    .template("Read {{path}}. Make one change. Run its tests.")
+    .expect("valid template");
+let mut document = Document::new(2_000, "Loaded on every request.", vec![workflow.into()]);
 document.sign();
-assert_eq!(document.get_element_by_id("system").unwrap().to_string(), "Review the change.");
 ```
 
-Use `parse`, `parse_file`, `lint`, and `render`. Supply a `TokenCounter`, or enable `tokens` and use `Cl100k`. `sections()` returns direct child sections. `to_string()` is an unchecked text view with `{{name}}` placeholders; `render` returns checked substitutions. Section IDs do not assign SDK message roles.
+`.template()` parses `{{name}}` through the same code path as markup text, so this document produces the same nodes as its parsed equivalent, differing only in source positions; `.text()` appends literal content instead. Use `parse`, `parse_file`, `lint`, and `Document::render`. Supply a `TokenCounter`, or enable `tokens` and use `Cl100k`. `elements()` returns direct child elements and `elements_by_name(name)` searches descendants. `to_string()` is an unchecked text view with `{{name}}` placeholders; `render` returns checked text with per-element provenance.
+
+Run the complete file-to-text example with `cargo run --locked --example composition --features tokens`.
 
 Other languages can use the CLI's JSON output and generated schema. Native bindings and source-code literal analysis are future work.
 
-## Runtime prompts
+## Structure here, meaning in your types
 
-Enable `runtime` for attributed model requests, typed text/image/tool content, and categorized usage accounting. Every `PromptFragment` requires a source and role. `ModelRequest::estimate()` returns an explicit heuristic; `TokenUsage` keeps it separate from provider-reported usage and represents unavailable attribution as `None`.
-
-```toml
-[dependencies]
-htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }
-```
+HTMLP assigns no roles, no message kinds, and no trust levels. An element named `system-prompt` is a label for a human reader and for `elements_by_name`; it never becomes a provider role. Applications that need those distinctions define them in their own type system and pair them with checked output:
 
 ```rust
-use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
-
-let request = ModelRequest::builder("my-model")
-    .fragment(PromptFragment::text(
-        ContentSource::SystemPrompt, Role::System, "Review the change.",
-    ))
-    .build();
-let estimate = request.estimate();
+enum Category {
+    SystemPrompt,
+    ContextBlock { block_id: String },
+}
 ```
 
-`render_checked` returns immutable text, tokenizer measurements, and section provenance. Pass it to `PromptFragment::checked` to bridge files into attributed requests. [Runtime API guide](docs/runtime.md).
-
-Run the complete file-to-request example with `cargo run --locked --example runtime --features runtime,tokens`. HTMLP supplies types and measurements; your provider adapter sends requests. Category attributes in markup remain future work.
+HTMLP proves the text is within budget; your types prove the text is attributed. 0.2's optional `runtime` feature encoded one harness's vocabulary — system prompts, assistant history, tool definitions — and is removed in 0.3. See the [Rust interface guide](docs/rust.md) and [design decisions](docs/decisions.md).
 
 ## Documentation
 
-[Website and guide](https://htmlp.dev/) · [Specification](docs/spec.md) · [Generated Rust API](https://htmlp.dev/api/htmlp/index.html) · [JSON Schema](schema/document.schema.json)
+[Website and guide](https://htmlp.dev/) · [Specification](docs/spec.md) · [Rust interface](docs/rust.md) · [Generated Rust API](https://htmlp.dev/api/htmlp/index.html) · [JSON Schema](schema/document.schema.json)
 
 [Contributing](CONTRIBUTING.md) · [Design decisions](docs/decisions.md) · [Roadmap](docs/roadmap.md) · [Security](SECURITY.md)
 
-This is a breaking 0.2 alpha. The former TypeScript/character-budget implementation remains at [v0.1.0-alpha.1](https://github.com/alexmckenley/htmlp/tree/v0.1.0-alpha.1). Inline constraints are editable: protect budget changes through review or CI policy. A required reason explains a limit; it does not make that limit immutable.
+This is a breaking 0.3 alpha; see the [changelog](CHANGELOG.md) to upgrade. The former TypeScript/character-budget implementation remains at [v0.1.0-alpha.1](https://github.com/alexmckenley/htmlp/tree/v0.1.0-alpha.1). Inline constraints are editable: protect budget changes through review or CI policy. A required reason explains a limit; it does not make that limit immutable.
 
 MIT licensed. See [LICENSE](LICENSE).

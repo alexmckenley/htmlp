@@ -25,10 +25,10 @@ fn rendered_spans_partition_unicode_text_and_keep_section_ancestry() {
     )
     .unwrap();
     assert_eq!(output.text(), "😀Aé{{literal}}Z");
-    assert_eq!(output.section("inner"), Some("é{{literal}}"));
-    assert_eq!(output.section("outer"), Some("Aé{{literal}}Z"));
-    assert_eq!(output.section("empty"), Some(""));
-    assert_eq!(output.section("absent"), None);
+    assert_eq!(output.element("inner"), Some("é{{literal}}"));
+    assert_eq!(output.element("outer"), Some("Aé{{literal}}Z"));
+    assert_eq!(output.element("empty"), Some(""));
+    assert_eq!(output.element("absent"), None);
     assert_eq!(
         output.measurement().tokens,
         output.text().chars().count() as u64
@@ -48,7 +48,7 @@ fn rendered_spans_partition_unicode_text_and_keep_section_ancestry() {
         .unwrap();
     assert_eq!(
         variable
-            .sections
+            .elements
             .iter()
             .map(|s| s.id.as_deref())
             .collect::<Vec<_>>(),

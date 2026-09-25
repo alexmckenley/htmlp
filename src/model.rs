@@ -47,7 +47,7 @@ impl std::error::Error for Diagnostic {}
 #[cfg_attr(feature = "json", serde(deny_unknown_fields))]
 pub struct Limits {
     pub max_tokens: Option<u64>,
-    /// Applies to each direct child section; does not change grandchildren.
+    /// Applies to each direct child element; does not change grandchildren.
     pub per_item: Option<u64>,
     /// Required, nonblank rationale whenever either limit is declared.
     pub reason: Option<String>,
@@ -65,16 +65,17 @@ pub struct Limits {
 )]
 pub enum Node {
     Text { value: String },
-    Section(Section),
+    Element(Element),
     Variable(Variable),
 }
 
-/// A semantic grouping. IDs have no provider-specific role or trust meaning.
+/// A named grouping. Names and optional IDs have no provider role or trust meaning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json", serde(deny_unknown_fields))]
-pub struct Section {
+pub struct Element {
+    pub name: String,
     pub id: Option<String>,
     pub limits: Limits,
     pub children: Vec<Node>,
@@ -116,16 +117,16 @@ pub type Bindings = BTreeMap<String, String>;
 /// the first reference in source order.
 #[derive(Debug, Clone, Copy)]
 pub enum ElementRef<'a> {
-    Section(&'a Section),
+    Element(&'a Element),
     Variable(&'a Variable),
 }
 
 fn lookup<'a>(nodes: &'a [Node], id: &str) -> Option<ElementRef<'a>> {
     for node in nodes {
         match node {
-            Node::Section(s) => {
+            Node::Element(s) => {
                 if s.id.as_deref() == Some(id) {
-                    return Some(ElementRef::Section(s));
+                    return Some(ElementRef::Element(s));
                 }
                 if let Some(found) = lookup(&s.children, id) {
                     return Some(found);
@@ -137,11 +138,11 @@ fn lookup<'a>(nodes: &'a [Node], id: &str) -> Option<ElementRef<'a>> {
     }
     None
 }
-fn sections(nodes: &[Node]) -> Vec<&Section> {
+fn elements(nodes: &[Node]) -> Vec<&Element> {
     nodes
         .iter()
         .filter_map(|n| {
-            if let Node::Section(s) = n {
+            if let Node::Element(s) = n {
                 Some(s)
             } else {
                 None
@@ -153,7 +154,7 @@ fn display_nodes(nodes: &[Node], f: &mut fmt::Formatter<'_>) -> fmt::Result {
     for n in nodes {
         match n {
             Node::Text { value } => f.write_str(value)?,
-            Node::Section(s) => display_nodes(&s.children, f)?,
+            Node::Element(s) => display_nodes(&s.children, f)?,
             // Preserve unresolved slots visibly; never silently drop them.
             Node::Variable(v) => write!(f, "{{{{{}}}}}", v.id)?,
         }
@@ -164,7 +165,7 @@ impl Document {
     /// Construct in memory without authoring HTMLP. [`crate::lint`] validates it.
     pub fn new(max_tokens: u64, reason: impl Into<String>, children: Vec<Node>) -> Self {
         Self {
-            version: "0.2".into(),
+            version: "0.3".into(),
             tokenizer: "cl100k_base".into(),
             limits: Limits {
                 max_tokens: Some(max_tokens),
@@ -179,25 +180,92 @@ impl Document {
     pub fn get_element_by_id(&self, id: &str) -> Option<ElementRef<'_>> {
         lookup(&self.children, id)
     }
-    pub fn sections(&self) -> Vec<&Section> {
-        sections(&self.children)
+    pub fn elements(&self) -> Vec<&Element> {
+        elements(&self.children)
+    }
+    pub fn elements_by_name(&self, name: &str) -> Vec<&Element> {
+        elements_by_name(&self.children, name)
+    }
+    pub fn element(mut self, element: Element) -> Self {
+        self.children.push(Node::Element(element));
+        self
+    }
+    /// Bind and validate the whole document before exposing checked text.
+    pub fn render(
+        &self,
+        bindings: &Bindings,
+        counter: &impl crate::TokenCounter,
+    ) -> Result<crate::RenderedDocument, Vec<Diagnostic>> {
+        crate::render_checked(self, bindings, counter)
     }
 }
-impl Section {
-    pub fn new(id: impl Into<String>, children: Vec<Node>) -> Self {
+impl Element {
+    /// Construct a named element with no ID. Names are validated by lint/render.
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
-            id: Some(id.into()),
+            name: name.into(),
+            id: None,
             limits: Limits::default(),
-            children,
+            children: Vec::new(),
             position: Position::default(),
         }
+    }
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+    /// Append literal text. Braces, entities, and markup are never interpreted.
+    pub fn text(mut self, value: impl Into<String>) -> Self {
+        self.children.push(Node::text(value));
+        self
+    }
+    pub fn variable(mut self, name: impl Into<String>) -> Self {
+        self.children.push(Node::variable(name));
+        self
+    }
+    /// Append a text template. Only {{name}} is interpreted; bindings remain literal.
+    pub fn template(mut self, value: &str) -> Result<Self, Diagnostic> {
+        self.children.extend(crate::parse_template(value)?);
+        Ok(self)
+    }
+    pub fn element(mut self, element: Element) -> Self {
+        self.children.push(Node::Element(element));
+        self
+    }
+    pub fn max_tokens(mut self, tokens: u64, reason: impl Into<String>) -> Self {
+        self.limits.max_tokens = Some(tokens);
+        self.limits.reason = Some(reason.into());
+        self.limits.sig = None;
+        self
+    }
+    pub fn per_item(mut self, tokens: u64, reason: impl Into<String>) -> Self {
+        self.limits.per_item = Some(tokens);
+        self.limits.reason = Some(reason.into());
+        self.limits.sig = None;
+        self
     }
     pub fn get_element_by_id(&self, id: &str) -> Option<ElementRef<'_>> {
         lookup(&self.children, id)
     }
-    pub fn sections(&self) -> Vec<&Section> {
-        sections(&self.children)
+    pub fn elements(&self) -> Vec<&Element> {
+        elements(&self.children)
     }
+    pub fn elements_by_name(&self, name: &str) -> Vec<&Element> {
+        elements_by_name(&self.children, name)
+    }
+}
+fn elements_by_name<'a>(nodes: &'a [Node], name: &str) -> Vec<&'a Element> {
+    let mut found = Vec::new();
+    let mut pending: Vec<_> = nodes.iter().rev().collect();
+    while let Some(node) = pending.pop() {
+        if let Node::Element(element) = node {
+            if element.name == name {
+                found.push(element);
+            }
+            pending.extend(element.children.iter().rev());
+        }
+    }
+    found
 }
 impl Node {
     pub fn text(value: impl Into<String>) -> Self {
@@ -205,8 +273,19 @@ impl Node {
             value: value.into(),
         }
     }
+    pub fn variable(id: impl Into<String>) -> Self {
+        Self::Variable(Variable {
+            id: id.into(),
+            position: Position::default(),
+        })
+    }
 }
-impl fmt::Display for Section {
+impl From<Element> for Node {
+    fn from(element: Element) -> Self {
+        Self::Element(element)
+    }
+}
+impl fmt::Display for Element {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_nodes(&self.children, f)
     }
@@ -219,7 +298,7 @@ impl fmt::Display for Document {
 impl fmt::Display for ElementRef<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Section(s) => s.fmt(f),
+            Self::Element(s) => s.fmt(f),
             Self::Variable(v) => write!(f, "{{{{{}}}}}", v.id),
         }
     }
@@ -231,6 +310,9 @@ impl fmt::Display for ElementRef<'_> {
 #[cfg_attr(feature = "json", derive(serde::Serialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Measurement {
+    pub name: String,
+    /// Child-node indices from the document root; empty for the root itself.
+    pub path: Vec<usize>,
     pub id: Option<String>,
     pub tokens: Option<u64>,
     pub limit: Option<u64>,

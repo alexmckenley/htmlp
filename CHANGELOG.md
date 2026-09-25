@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0-alpha.1
+
+Breaking. Element names are author-chosen and the runtime API is gone.
+
+- Replace the single `section` element with author-chosen names: lowercase ASCII letters, digits, and hyphens, starting with a letter. `htmlp` stays reserved for the root, and the attribute set stays closed.
+- Rename the Rust `Section` type to `Element` and give it a `name`; `id` is optional. `Node::Section` becomes `Node::Element`; `sections()` becomes `elements()`, plus `elements_by_name(name)`.
+- Add an `Element` builder: `new`, `id`, `text`, `variable`, `template`, `element`, `max_tokens`, and `per_item`. Setting a budget clears its signature.
+- Add `parse_template` and `Element::template` so Rust interpolation parses `{{name}}` through the same code path as markup text. An in-memory document produces the same nodes as its parsed equivalent, differing only in source positions.
+- Add `Document::render(&bindings, &counter)` as the checked entry point, `Document::element`, and `Document::elements_by_name`.
+- Rename `RenderedPrompt` to `RenderedDocument` and `SectionOrigin` to `ElementOrigin`; add `name` and a `path` of child indices so anonymous elements stay identifiable. Add `RenderedElement`, `elements()`, and `elements_by_name()`.
+- Add `name` and `path` to `Measurement`; budget diagnostics label anonymous elements by name and path.
+- Remove the `runtime` feature: `ContentSource`, `Role`, `PromptFragment`, `ContentBlock`, `ToolDefinition`, `ModelRequest`, `ByteEstimator`, `RequestEstimate`, `ReportedUsage`, and `TokenUsage`. Roles, message kinds, and usage accounting belong to the application; HTMLP validates structure and budgets. Move these types into your own crate, then pair a category with `Document::render` output.
+- Remove the request and usage JSON schemas and the `runtime` examples; add `examples/composition.rs`.
+- Documents declare `version` `0.3`; `0.2` files fail. Existing files upgrade by renaming `section` tags to whatever name fits, or leaving them as `section`, which remains a valid name.
+
 ## 0.2.0-alpha.4
 
 - Add optional `htmlp::runtime`: attributed prompt fragments, roles, tool/image/reasoning blocks, model requests, and source categories.

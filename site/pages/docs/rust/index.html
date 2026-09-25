@@ -4,116 +4,97 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rust interface — HTMLP</title>
-<meta name="description" content="Build attributed model requests, render checked prompt files, and track estimates and provider-reported token usage with HTMLP.">
+<meta name="description" content="Build HTMLP documents in Rust with the Element builder, interpolate variables exactly as markup does, and read checked output with per-element provenance.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
 <body>
-<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/" aria-current="page">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<header><a class="wordmark" href="{{BASE}}/">htmlp</a><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/rust/" aria-current="page">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
 <h1>Rust interface</h1>
-<p class="lead">Give every prompt fragment a source. Keep estimates and reported usage distinct.</p>
-<p>Use HTMLP's runtime types without writing a prompt file, or connect them to checked file rendering. Your provider adapter sends the request; HTMLP supplies the types and accounting.</p>
+<p class="lead">One primitive in two syntaxes. Markup and Rust build the same tree.</p>
+<p>An <code>Element</code> has a name, an optional id, optional budgets, and children — the same things a start tag carries. Nothing in the library assigns provider roles, message kinds, or trust levels; your application decides what a name means.</p>
 <h2>Install</h2>
 <pre><code>[dependencies]
-htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }</code></pre>
-<p><code>runtime</code> enables JSON types without a provider SDK, async runtime, networking, or tokenizer tables. Add <code>tokens</code> for <code>Cl100k</code>. See all <a href="{{BASE}}/docs/#features">library features</a>.</p>
-<h2>Build a request</h2>
-<pre><code>use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.3.0-alpha.1" }</code></pre>
+<p>The default library has no provider SDK, async runtime, networking, or tokenizer tables. Add <code>tokens</code> for <code>Cl100k</code> and <code>json</code> for serialization. See all <a href="{{BASE}}/docs/#features">library features</a>.</p>
+<h2>Build a document</h2>
+<pre><code>use htmlp::{Document, Element};
 
-let request = ModelRequest::builder("my-model")
-    .fragment(PromptFragment::text(
-        ContentSource::SystemPrompt,
-        Role::System,
-        "Review the change.",
-    ))
-    .fragment(PromptFragment::text(
-        ContentSource::UserMessage,
-        Role::User,
-        "Check the parser.",
-    ))
-    .max_output_tokens(1024)
-    .build();
+let workflow = Element::new("workflow")
+    .id("routine")
+    .max_tokens(500, "Keep routine steps short.")
+    .text("Read the code. Make one change. Run its tests.");
+let mut document = Document::new(2_000, "Loaded on every request.", vec![workflow.into()]);
+document.sign(); // Explicitly accept the budgets authored above.</code></pre>
+<p><code>Element::new(name)</code> accepts any valid name: lowercase ASCII letters, digits, and hyphens, starting with a letter. <code>htmlp</code> is reserved for the root. The name is the element's kind; the optional <code>id</code> is its identity. <code>max_tokens</code> and <code>per_item</code> each require a reason and clear any existing signature, so changing a budget in Rust also requires <code>Document::sign()</code>.</p>
+<p>Builder methods append in call order: <code>text</code> adds literal text, <code>variable</code> adds a placeholder, <code>element</code> nests a child, and <code>template</code> parses interpolation. <code>Node::text</code>, <code>Node::variable</code>, and <code>From&lt;Element&gt;</code> construct nodes directly.</p>
+<h2>Interpolate like a file</h2>
+<p><code>template</code> accepts the same syntax as markup text and produces the same nodes, so a Rust-built document and a parsed one differ only in source positions:</p>
+<pre><code>use htmlp::{Bindings, Cl100k, Document, Element, parse};
 
-let estimate = request.estimate();
-let system_tokens = estimate.tokens_for(&amp;ContentSource::SystemPrompt);</code></pre>
-<p><code>PromptFragment</code> has private fields. Every constructor requires a <code>ContentSource</code> and a <code>Role</code>; <code>ModelRequestBuilder</code> accepts attributed fragments. The type system requires a category, while the caller chooses the correct one. Source and role are independent: repository context can use <code>Role::User</code>.</p>
-<h2>Attribute context</h2>
-<table>
-<thead><tr><th><code>ContentSource</code></th><th>Use for</th></tr></thead>
-<tbody>
-<tr><td><code>SystemPrompt</code></td><td>Base instructions.</td></tr>
-<tr><td><code>ContextBlock { block_id }</code></td><td>Named rules, skills, environment, or retrieved context.</td></tr>
-<tr><td><code>ToolDefinitions</code></td><td>Available tool schemas; builder tools are counted here automatically.</td></tr>
-<tr><td><code>UserMessage</code>, <code>SessionMessage</code></td><td>User-authored input and session messages.</td></tr>
-<tr><td><code>AssistantHistory</code></td><td>Replayed assistant output.</td></tr>
-<tr><td><code>ToolOutput { tool_name }</code></td><td>Results attributed to a named tool.</td></tr>
-<tr><td><code>SystemReminder { origin }</code>, <code>Hook { hook_name }</code></td><td>Harness-injected reminders and hooks.</td></tr>
-<tr><td><code>CompactionSummary</code></td><td>Summarized conversation context.</td></tr>
-</tbody>
-</table>
-<p>Names are part of the source key, so two skill IDs have separate accounting. These categories belong to the Rust and JSON API. Markup currently has no <code>category</code> or <code>source</code> attribute, and section IDs do not assign a source or role.</p>
-<h2>Render a checked file</h2>
-<p>Author a file with budgets and reasons, then run <code>htmlp sign rules.htmlp</code>. Add <code>tokens</code> alongside <code>runtime</code> for this example:</p>
-<pre><code>use htmlp::{Bindings, Cl100k, parse_file, render_checked};
-use htmlp::runtime::{ContentSource, PromptFragment, Role};
+let answer = Element::new("answer")
+    .template("Answer: {{question}}")
+    .expect("valid template");
+let mut built = Document::new(1_000, "Request context.", vec![answer.into()]);
+built.sign();
+let parsed = parse(
+    r#"&lt;htmlp max-tokens="1k" reason="Request context." sig="a66b5750507d50df"&gt;&lt;answer&gt;Answer: {{question}}&lt;/answer&gt;&lt;/htmlp&gt;"#,
+)
+.expect("valid markup");
+
+let counter = Cl100k::new().expect("tokenizer");
+let bindings = Bindings::from([("question".into(), "What changed?".into())]);
+assert_eq!(
+    built.render(&amp;bindings, &amp;counter).expect("valid").text(),
+    parsed.render(&amp;bindings, &amp;counter).expect("valid").text(),
+);</code></pre>
+<p>Only <code>{{name}}</code> is special. Other characters, including <code>&lt;</code> and <code>&amp;</code>, stay literal: <code>template</code> does not decode entities, because entity syntax belongs to the file format. Use <code>text</code> for content containing literal braces, and <code>parse_template(source)</code> for nodes without an element wrapper. Template errors carry line, column, and byte offset like parse errors.</p>
+<h2>Render and check</h2>
+<pre><code>use htmlp::{Bindings, Cl100k, parse_file};
 
 let document = parse_file("rules.htmlp").expect("valid markup");
 let counter = Cl100k::new().expect("tokenizer");
-let bindings = Bindings::from([("task".into(), "Review the change.".into())]);
-let rendered = render_checked(&amp;document, &amp;bindings, &amp;counter)
-    .expect("valid signatures, bindings, and budgets");
-let fragment = PromptFragment::checked(
-    ContentSource::SystemPrompt, Role::System, &amp;rendered,
-);</code></pre>
-<p>Handle diagnostics in your application; <code>expect</code> keeps these examples short. Rendering substitutes values literally and enforces every file, section, and direct-item budget. Missing bindings, invalid signatures, and exceeded budgets return errors before any checked text is exposed.</p>
-<ul>
-<li><code>text()</code> returns the final text; <code>into_text()</code> consumes the checked value.</li>
-<li><code>measurement()</code> identifies the tokenizer and complete document count.</li>
-<li><code>section(id)</code> selects text only after the entire document passes validation.</li>
-<li><code>spans()</code> partitions the text into non-overlapping UTF-8 byte ranges with section ancestry and optional variable names.</li>
-<li><code>report()</code> includes overlapping budget measurements. Do not sum parent and child counts.</li>
-</ul>
-<p><code>PromptFragment::checked</code> copies validated text into a fragment. Runtime estimation still uses its explicit heuristic; it does not reuse the file's exact count. Extracting and changing a string does not retain the original validation guarantee.</p>
-<h2>Track token usage</h2>
+let bindings = Bindings::from([("question".into(), "What changed?".into())]);
+let rendered = document
+    .render(&amp;bindings, &amp;counter)
+    .expect("valid signatures, bindings, and budgets");</code></pre>
+<p>Handle diagnostics in your application; <code>expect</code> keeps these examples short. <code>Document::render</code> is the checked entry point, and the free function <code>render_checked(&amp;document, &amp;bindings, &amp;counter)</code> is the same thing. It returns a <code>RenderedDocument</code> only after validating element names, unique ids, budget signatures, every binding, and every root, element, and per-item budget. No constructor or deserializer can fabricate checked output, and failure returns diagnostics instead of partial text.</p>
+<p><code>parse</code> and <code>parse_file</code> validate syntax only. <code>lint</code> checks structure and fully static budgets; rendering also binds variables and enforces final budgets. <code>to_string()</code> is an unchecked text view showing unbound variables as <code>{{name}}</code>.</p>
+<h2>Read checked output</h2>
 <table>
-<thead><tr><th>Type</th><th>Measurement</th></tr></thead>
+<thead><tr><th>Method</th><th>Returns</th></tr></thead>
 <tbody>
-<tr><td><code>TextMeasurement</code></td><td>Complete rendered document count from the chosen tokenizer.</td></tr>
-<tr><td><code>RequestEstimate</code></td><td>Heuristic request allocation by source, including image reserves.</td></tr>
-<tr><td><code>ReportedUsage</code></td><td>Provider-reported totals for one call.</td></tr>
-<tr><td><code>TokenUsage</code></td><td>Optional estimate, optional reported usage, and context window.</td></tr>
+<tr><td><code>text()</code>, <code>into_text()</code></td><td>The final text, borrowed or owned.</td></tr>
+<tr><td><code>measurement()</code></td><td><code>TextMeasurement</code>: tokenizer identifier and total count.</td></tr>
+<tr><td><code>element(id)</code></td><td>One element's text, selected only after the whole document passed.</td></tr>
+<tr><td><code>elements_by_name(name)</code></td><td>Every element with that name, in source order.</td></tr>
+<tr><td><code>elements()</code></td><td>Every <code>RenderedElement</code>: origin and byte range, including empty ones.</td></tr>
+<tr><td><code>spans()</code></td><td>Non-overlapping <code>RenderedSpan</code> ranges with element ancestry.</td></tr>
+<tr><td><code>report()</code></td><td>Per-element budget <code>Measurement</code>s.</td></tr>
 </tbody>
 </table>
-<pre><code>use htmlp::runtime::{ReportedUsage, TokenUsage};
-
-let usage = TokenUsage {
-    estimate: Some(request.estimate()),
-    reported: Some(ReportedUsage {
-        input_tokens: 120,
-        cache_read_tokens: 80,
-        output_tokens: 30,
-        reasoning_tokens: 10,
-        ..Default::default()
-    }),
-    context_window_tokens: 128_000,
-};
-assert_eq!(usage.prompt_tokens(), Some(200));</code></pre>
-<p><code>prompt_tokens()</code> prefers reported input plus cache reads and writes, then falls back to the estimate. It returns <code>None</code> when neither exists. An external harness with unavailable attribution should set <code>estimate: None</code>.</p>
-<p><code>ReportedUsage.input_tokens</code> is uncached input; cache lanes are disjoint. Reasoning tokens are a subset of output, not an extra output charge. Provider adapters normalize their own conventions. Merge cumulative snapshots of the same call with <code>merge_snapshot</code>; sum distinct completed calls with <code>add_call</code>.</p>
-<p><code>ByteEstimator</code> defaults to four UTF-8 payload bytes per token, rounded up once per full source key, plus 8,192 tokens per image. Customize its nonzero <code>bytes_per_token</code> and <code>image_tokens</code> fields, then call <code>estimate(&amp;request)</code>. <code>sources()</code> exposes each allocation; <code>total_tokens()</code> derives the sum. These estimates exclude provider framing and do not enforce a context-window limit.</p>
-<h2>Tools, images, and adapters</h2>
-<p><code>PromptFragment::new</code> accepts typed <code>ContentBlock</code> values: text, reasoning, images, tool uses, and tool results. Supply tool-call IDs with <code>ToolUseId::from_string</code>. Add <code>ToolDefinition</code> values through <code>builder.tool(...)</code>; schemas use JSON. Set output limits and reasoning preferences with <code>max_output_tokens</code> and <code>thinking_level</code>.</p>
-<p>Adapters read <code>request.fragments()</code>, <code>request.tools()</code>, and request settings to build provider-specific messages. <code>bytes_by_source()</code> measures raw payload bytes, including image transport data; it is distinct from token estimation.</p>
-<p>Request helpers return derived requests: <code>with_suffix_instruction</code> appends an attributed user instruction and removes tools; <code>with_warm_probe</code> keeps tools, appends a reminder, and sets a one-token output limit; <code>without_image_blocks</code> replaces images with a text note while preserving attribution. Estimate the resulting request before sending it. Cache behavior and provider compatibility remain the adapter's responsibility.</p>
+<p><code>ElementOrigin</code> carries <code>name</code>, <code>path</code>, <code>id</code>, and <code>position</code>. <code>path</code> is the chain of child indices from the document root, so anonymous elements remain identifiable and two elements sharing a name never collapse into one. Selecting one element cannot skip its ancestors' constraints, because selection happens after the whole document validates.</p>
+<p>Per-element ranges nest and may overlap; <code>spans()</code> partitions the text exactly once. Budget measurements include descendants, so summing a parent and its children double-counts. Group by <code>spans()</code> when attributing tokens to categories.</p>
+<h2>Names, ids, and your own types</h2>
+<p>Names and ids are labels. HTMLP has no built-in <code>system-prompt</code>, <code>user-message</code>, or <code>tool-definition</code> element, and derives nothing from a name you choose. An application that needs those distinctions defines them in its own type system and attaches them to rendered output:</p>
+<pre><code>enum Category {
+    SystemPrompt,
+    ContextBlock { block_id: String },
+}</code></pre>
+<p>Then pair a <code>Category</code> with <code>rendered.element("routine")</code> or with the whole document's <code>text()</code>. Two guarantees stay separate: HTMLP proves the text is within budget, and your types prove the text is attributed. A root element named <code>system-prompt</code> still carries no role — the name documents intent for a human reader and for <code>elements_by_name</code> lookup.</p>
+<p>0.2 shipped an optional <code>runtime</code> feature with typed model requests, roles, and content-source categories. That made one harness's vocabulary a public contract of the format, so 0.3 removes it. Move those types into your own crate; roles, tool-call identity, request settings, cache behavior, provider framing, and usage accounting all belong to the caller, who can change them without a format release.</p>
+<h2>Tokenizers</h2>
+<p><code>TokenCounter</code> is a trait with <code>name()</code> and <code>count(text)</code>. Linting requires the counter's name to match the document's declared <code>tokenizer</code>, which defaults to <code>cl100k_base</code>. Enable <code>tokens</code> for <code>Cl100k</code>, or implement the trait against your provider's tokenizer.</p>
+<p>Counts exclude provider message framing, tool schemas, and SDK overhead. Text token counts are not additive across concatenation boundaries, which is why rendering re-tokenizes each complete subtree after substitution rather than adding up static counts.</p>
 <h2>Reference</h2>
 <ul>
-<li><a href="{{BASE}}/api/htmlp/runtime/index.html">Generated runtime API</a> · <a href="{{BASE}}/api/htmlp/index.html">Parser and rendering API</a></li>
-<li><a href="{{BASE}}/request.schema.json">Request JSON Schema</a> · <a href="{{BASE}}/usage.schema.json">Usage JSON Schema</a></li>
-<li><a href="{{BASE}}/runtime.md">Plain Markdown reference</a></li>
-<li><a href="https://github.com/alexmckenley/htmlp/blob/main/examples/runtime.rs">Runnable Rust example</a></li>
+<li><a href="{{BASE}}/api/htmlp/index.html">Generated Rust API</a></li>
+<li><a href="{{BASE}}/document.schema.json">Document JSON Schema</a></li>
+<li><a href="{{BASE}}/rust.md">Plain Markdown reference</a> · <a href="{{BASE}}/spec.md">Specification</a></li>
+<li><a href="https://github.com/alexmckenley/htmlp/blob/main/examples/composition.rs">Runnable Rust example</a></li>
 </ul>
-<p>The JSON schemas describe serialized shapes. <code>PromptFragment</code> and <code>ModelRequest</code> are constructed through Rust APIs, not deserialized from JSON. HTMLP does not send model requests or provide native bindings for other languages. Other languages can use the CLI's JSON document output.</p>
+<p>Run it with <code>cargo run --locked --example composition --features tokens</code>. Generate API documentation with <code>cargo doc --all-features --no-deps</code>. The schema describes serialized document shape; semantic invariants still require <code>lint</code> or rendering. Other languages can use the CLI's JSON output; native bindings are future work.</p>
 </main>
-<footer>HTMLP 0.2 · Alpha · <a href="{{BASE}}/">Home</a></footer>
+<footer>HTMLP 0.3 · Alpha · <a href="{{BASE}}/">Home</a></footer>
 </body>
 </html>

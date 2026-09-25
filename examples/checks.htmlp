@@ -1,4 +1,4 @@
 <htmlp max-tokens="10k" per-item="1k" reason="Keep checks concise." sig="0929d7debf6795d7">
-<section id="test">Run the affected tests.</section>
-<section id="commit">Explain the change.</section>
+<check id="test">Run the affected tests.</check>
+<check id="commit">Explain the change.</check>
 </htmlp>

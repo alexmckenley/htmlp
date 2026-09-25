@@ -1,53 +1,63 @@
-# HTMLP 0.2
+# HTMLP 0.3
 
-Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.
+Statically enforceable token limits for context files. A strict prompt file format and a matching Rust API.
 
-Use prompt files, Rust runtime types, or both. Current release: v0.2.0-alpha.4.
-CLI: cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
-Rust: htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.2.0-alpha.4", features = ["runtime"] }
-Add tokens for Cl100k. No default features; runtime includes json, not tokenizer tables.
+Current release: v0.3.0-alpha.1. Distributed through GitHub, not crates.io.
+CLI: cargo install --git https://github.com/alexmckenley/htmlp --tag v0.3.0-alpha.1 --features cli
+Rust: htmlp = { git = "https://github.com/alexmckenley/htmlp", tag = "v0.3.0-alpha.1" }
+Add tokens for Cl100k, json for serialization, schema for the document JSON Schema.
 
 Save as .htmlp:
 <htmlp max-tokens="1k" reason="Shared context.">
-<section id="workflow">Make one change. Test it.</section>
+<workflow id="routine">Make one change. Test it.</workflow>
 </htmlp>
 
 Sign intentional budgets: htmlp sign ./prompts
 Check: htmlp check ./prompts
+One htmlp root per file. Every other element name is author-chosen.
+Names are lowercase ASCII letters, digits, hyphens; must start with a letter; htmlp is reserved.
+Names are open, attributes are closed: id, max-tokens, per-item, reason, sig. Unknown attribute = error.
+A name carries no role, message kind, or trust meaning. HTMLP defines no vocabulary.
+id is optional and unique per file. Name = kind, id = identity; several elements may share a name.
 Every declared max-tokens or per-item requires a nonblank reason on that element.
 sig hashes local limits and reason; check rejects missing/stale signatures.
 Content edits do not need re-signing. Do not automatically sign in CI.
 Signatures are checksums, not approvals; editors can re-sign unchanged reasons.
 Each file is independent; no external configuration or directory inheritance.
 1k = 1000 tokens. Default encoding: cl100k_base, not a universal model tokenizer.
-Use section IDs for lookup. Variables use {{name}}, with no limits or attributes.
+max-tokens bounds an element's whole subtree; per-item caps each direct child element.
+Variables use {{name}}, with no limits or attributes; names cannot collide with ids.
 Repeated variable names reuse a binding. Empty elements may self-close.
-Escape literal < and & in Markdown. Unknown markup fails.
+Escape literal < and & in Markdown. Write &#123;&#123;name}} for a literal {{name}}. Unknown markup fails.
 Static checks defer variable-dependent budgets (tokens: null, deferred: true).
-render substitutes literal bindings and checks final file and section budgets.
+render substitutes literal bindings and checks final file, element, and per-item budgets.
 Inline limits and reasons are editable; policy changes need review.
 
-Runtime feature: attributed fragments, model requests, explicit estimates, reported usage.
-PromptFragment::text(source, role, text); ModelRequest::builder(model).fragment(fragment).build().
-ContentSource categories: SystemPrompt, ContextBlock{block_id}, ToolDefinitions, UserMessage,
-SessionMessage, AssistantHistory, ToolOutput{tool_name}, SystemReminder{origin}, Hook{hook_name}, CompactionSummary.
-Role is independently System, User, or Assistant. Your provider adapter sends requests.
-request.estimate(): UTF-8 bytes grouped by full source, rounded up at 4 bytes/token; 8192 tokens/image.
-ByteEstimator policy is configurable. Estimates exclude provider framing and do not enforce context capacity.
-TokenUsage separates optional estimate and optional reported usage; unavailable is None, not zero.
-Reported input excludes cache reads/writes; prompt_tokens adds all three. Reasoning is part of output.
-merge_snapshot takes maxima within one call; add_call sums distinct calls.
-render_checked returns immutable text, measurements, and section provenance.
-PromptFragment::checked(source, role, &rendered) bridges checked text into a request.
-section(id) selects only after the entire document passes. Do not sum overlapping budget measurements.
-No category attributes in markup yet.
-Rust guide: {{BASE}}/docs/runtime/
-Plain runtime reference: {{BASE}}/runtime.md
+Rust: markup and the API build the same tree. Element is the primitive in both.
+Element::new(name) with .id, .text, .variable, .template, .element, .max_tokens, .per_item.
+Setting a budget clears its signature; call Document::sign() to accept in-memory budgets.
+Document::new(max_tokens, reason, children), .element(child), .elements(), .elements_by_name(name).
+.template(source) and parse_template(source) parse {{name}} through the markup text path.
+Same nodes as markup, differing only in source positions. .text() is literal; templates do not decode entities.
+document.render(&bindings, &counter), equivalently render_checked(&document, &bindings, &counter).
+Returns RenderedDocument only after full validation; no partial output, no way to fabricate it.
+text(), into_text(), measurement(), element(id), elements_by_name(name), elements(), spans(), report().
+ElementOrigin has name, path (child indices from root), optional id, position; anonymous elements stay identifiable.
+Element ranges nest and may overlap; spans() partitions the text once. Do not sum parent and child measurements.
+parse/parse_file check syntax; lint checks static budgets; render enforces final budgets.
+to_string() is an unchecked text view showing unbound variables as {{name}}.
+TokenCounter trait: name() and count(text); lint requires a name matching the document tokenizer.
+
+HTMLP validates structure and budgets; the application owns meaning.
+No roles, message kinds, tool identity, request settings, or usage accounting in HTMLP.
+0.3 removed the 0.2 runtime feature (ContentSource, Role, PromptFragment, ModelRequest, TokenUsage).
+Define those categories in your own types and pair them with checked render output.
+An element named system-prompt is a label for readers and elements_by_name, never a provider role.
+
+Rust guide: {{BASE}}/docs/rust/
+Plain Rust reference: {{BASE}}/rust.md
 Guide: {{BASE}}/docs/
 Specification: {{BASE}}/spec.md
 Schema: {{BASE}}/document.schema.json
-Request schema: {{BASE}}/request.schema.json
-Usage schema: {{BASE}}/usage.schema.json
 Rust API: {{BASE}}/api/htmlp/index.html
-Runtime API: {{BASE}}/api/htmlp/runtime/index.html
 Source: https://github.com/alexmckenley/htmlp
