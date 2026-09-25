@@ -26,16 +26,21 @@ Make one change. Run its tests.
 &lt;section id="commit"&gt;Explain the change.&lt;/section&gt;
 &lt;/section&gt;</code></pre>
 <p>Place this section inside an <code>htmlp</code> root. The total is capped at 10,000 tokens; each item at 1,000. <code>per-item</code> applies to each direct child section. The smaller of that cap and the child's own cap wins. One reason explains the limits declared on that element.</p>
+<h2>Sign budgets</h2>
+<p>Run <code>htmlp sign ./prompts</code> after authoring. Each declared budget gets a short <code>sig</code> covering <code>max-tokens</code>, <code>per-item</code>, and <code>reason</code>. Checking rejects missing or stale signatures and asks you to rerun <code>htmlp sign</code> for intentional changes. Content edits need no re-signing.</p>
+<p>Review changes before signing; run only <code>check</code> in CI. The checksum is not approval: anyone can re-sign with the same reason or remove a constraint.</p>
 <h2>Variables</h2>
 <pre><code>&lt;htmlp max-tokens="1k" reason="Request context."&gt;
 Answer: {{question}}
 &lt;/htmlp&gt;</code></pre>
 <p>Variables have no limits or attributes. Static checks defer counts for sections containing variables. Rendering requires every referenced string binding and enforces file and section limits on the final text. Repeated names reuse the same binding; values are inserted literally.</p>
-<pre><code>htmlp render request.htmlp --vars values.json</code></pre>
+<pre><code>htmlp sign request.htmlp
+htmlp render request.htmlp --vars values.json</code></pre>
 <p>Write <code>&amp;#123;&amp;#123;name}}</code> for a literal <code>{{name}}</code>. JSON measurements use <code>tokens: null</code> and <code>deferred: true</code> until rendering.</p>
 <p><code>values.json</code>: <code>{"question":"What changed?"}</code></p>
 <h2>Commands</h2>
-<pre><code>htmlp check ./prompts         # each .htmlp file independently
+<pre><code>htmlp sign ./prompts          # accept current budgets explicitly
+htmlp check ./prompts         # each .htmlp file independently
 htmlp check rules.htmlp --json
 htmlp watch ./prompts         # editor diagnostics on changes
 htmlp parse rules.htmlp       # syntax-checked JSON AST
@@ -43,7 +48,7 @@ htmlp compile rules.htmlp     # static budgets checked; variables deferred
 htmlp render rules.htmlp      # checked prompt text</code></pre>
 <p>No ancestor rules or external configuration are loaded. Scans skip symlinks and <code>.git</code>, <code>node_modules</code>, <code>target</code>, <code>dist</code>, and <code>vendor</code>. A path with no matching files fails.</p>
 <h2>Rust and other languages</h2>
-<p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Section</code>, and <code>Variable</code> values. Construct nodes in memory with <code>Document::new</code>, <code>Section::new</code>, and <code>Node::text</code>. Call <code>lint</code> before use.</p>
+<p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Section</code>, and <code>Variable</code> values. Construct nodes in memory with <code>Document::new</code>, <code>Section::new</code>, and <code>Node::text</code>. Call <code>Document::sign()</code> to accept in-memory budgets, then <code>lint</code> before use. <code>sign_source</code> preserves file formatting.</p>
 <p><code>get_element_by_id</code> returns a typed reference. <code>sections()</code> returns direct child sections. <code>to_string()</code> extracts text with visible <code>{{name}}</code> placeholders; use <code>render</code> for checked substitutions. IDs such as <code>system</code> are labels, not SDK roles.</p>
 <p>Other languages can invoke the CLI and consume JSON. Native bindings and build-tool plugins are not included in this alpha.</p>
 <h2>Strict markup</h2>

@@ -1,5 +1,5 @@
-<htmlp max-tokens="2k" reason="Loaded on every request.">
-<section id="workflow" max-tokens="500" reason="Keep routine steps short.">
+<htmlp max-tokens="2k" reason="Loaded on every request." sig="389712615d06ebbc">
+<section id="workflow" max-tokens="500" reason="Keep routine steps short." sig="c03136d6113c87cc">
 Read the code. Make one change. Run its tests.
 </section>
 </htmlp>

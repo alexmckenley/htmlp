@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-alpha.3
+
+- Add `htmlp sign PATH` and short `sig` budget checksums covering `max-tokens`, `per-item`, and `reason`.
+- Reject missing and stale signatures in checking, compilation, rendering, and watch diagnostics. Existing files need an explicit initial sign.
+- Add `Document::sign()`, `sign_source`, and `sign_path`; retain source formatting during signing.
+- Signatures acknowledge edits; they are not authentication or proof of a changed reason.
+
 ## 0.2.0-alpha.2
 
 - Rename `max-item-tokens` to `per-item`, and the Rust/JSON field to `per_item`.

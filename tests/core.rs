@@ -9,10 +9,12 @@ impl TokenCounter for Scalars {
     }
 }
 fn document(body: &str) -> Document {
-    parse(&format!(
+    let mut doc = parse(&format!(
         r#"<htmlp tokenizer="scalar" max-tokens="1k" reason="Shared context.">{body}</htmlp>"#
     ))
-    .unwrap()
+    .unwrap();
+    doc.sign();
+    doc
 }
 #[test]
 fn budgets_are_integer_tokens() {
@@ -137,6 +139,7 @@ fn item_limits_do_not_apply_to_variables_or_plain_text() {
 fn static_and_runtime_budgets_are_both_enforced() {
     let mut d = document("a{{v}}");
     d.limits.max_tokens = Some(4);
+    d.sign();
     assert!(lint(&d, &Scalars).is_ok());
     let mut bindings = Bindings::new();
     assert!(render(&d, &bindings, &Scalars).is_err());
@@ -145,6 +148,7 @@ fn static_and_runtime_budgets_are_both_enforced() {
     bindings.insert("v".into(), "long".into());
     assert!(render(&d, &bindings, &Scalars).is_err());
     d.limits.max_tokens = Some(3);
+    d.sign();
     bindings.insert("v".into(), "".into());
     assert_eq!(render(&d, &bindings, &Scalars).unwrap(), "a");
     assert_eq!(d.to_string(), "a{{v}}");
@@ -169,6 +173,7 @@ fn final_counts_are_not_assumed_additive() {
     }
     let mut d = document("a{{v}}");
     d.limits.max_tokens = Some(2);
+    d.sign();
     assert!(lint(&d, &Boundary).is_ok());
     assert!(render(&d, &Bindings::from([("v".into(), "b".into())]), &Boundary).is_err());
     let d = document("<section>a</section><section>b</section>");
@@ -182,6 +187,7 @@ fn constructors_and_ids_are_typed_and_validated() {
     let s = Section::new("system", vec![Node::text("Review.")]);
     let mut d = Document::new(100, "Shared.", vec![Node::Section(s.clone())]);
     d.tokenizer = "scalar".into();
+    d.sign();
     assert!(matches!(
         d.get_element_by_id("system"),
         Some(ElementRef::Section(_))
@@ -335,7 +341,7 @@ fn per_item_is_enforced_after_binding() {
 #[test]
 fn variable_json_rejects_limits() {
     let d = document("{{v}}");
-    for key in ["max_tokens", "per_item", "limits", "reason"] {
+    for key in ["max_tokens", "per_item", "limits", "reason", "sig"] {
         let mut value = serde_json::to_value(&d).unwrap();
         value["children"][0][key] = serde_json::json!(10);
         assert!(serde_json::from_value::<Document>(value).is_err(), "{key}");

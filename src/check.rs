@@ -39,6 +39,13 @@ fn size(pieces: &[Piece], counter: &impl TokenCounter) -> Option<u64> {
 }
 
 fn require_reason(limits: &Limits, position: Position, errors: &mut Vec<Diagnostic>) {
+    if limits.sig != crate::budget_signature(limits) {
+        errors.push(Diagnostic::new(
+            "signature",
+            "Missing or mismatched budget signature. If you intend to do this, please rerun `htmlp sign` to regenerate the signature.",
+            position,
+        ));
+    }
     if (limits.max_tokens.is_some() || limits.per_item.is_some())
         && limits.reason.as_ref().is_none_or(|r| r.trim().is_empty())
     {

@@ -1,6 +1,6 @@
-use htmlp::{Bindings, Cl100k, Diagnostic, check_path, lint, parse_file, render};
+use htmlp::{Bindings, Cl100k, Diagnostic, check_path, lint, parse_file, render, sign_path};
 use std::{env, fs, path::Path, process::ExitCode};
-const HELP: &str = "HTMLP — Token limits for prompt files.\n\nhtmlp check PATH [--json]\nhtmlp parse FILE\nhtmlp compile FILE\nhtmlp render FILE [--vars bindings.json]\nhtmlp watch PATH\n\ncheck recursively validates .htmlp files independently. No repository config.\ncompile checks static budgets and emits JSON; variable-dependent budgets require render.\nExit: 0 success, 1 file validation errors, 2 usage or operational errors.\n";
+const HELP: &str = "HTMLP — Token limits for prompt files.\n\nhtmlp sign PATH\nhtmlp check PATH [--json]\nhtmlp parse FILE\nhtmlp compile FILE\nhtmlp render FILE [--vars bindings.json]\nhtmlp watch PATH\n\ncheck recursively validates .htmlp files independently. No repository config.\ncompile checks static budgets and emits JSON; variable-dependent budgets require render.\nExit: 0 success, 1 file validation errors, 2 usage or operational errors.\n";
 fn emit(file: &str, diagnostics: &[Diagnostic]) {
     for d in diagnostics {
         eprintln!(
@@ -35,7 +35,7 @@ fn run() -> Result<u8, String> {
         println!("htmlp {}", env!("CARGO_PKG_VERSION"));
         return Ok(0);
     }
-    if !["check", "parse", "compile", "render", "watch"].contains(&command.as_str()) {
+    if !["sign", "check", "parse", "compile", "render", "watch"].contains(&command.as_str()) {
         return Err(HELP.into());
     }
     let file = args.next().ok_or(HELP)?;
@@ -49,6 +49,11 @@ fn run() -> Result<u8, String> {
             }
             _ => return Err(format!("Unknown option: {flag}")),
         }
+    }
+    if command == "sign" {
+        let changed = sign_path(&file)?;
+        println!("HTMLP signed: {} file(s) updated", changed.len());
+        return Ok(0);
     }
     if command == "parse" {
         return match parse_file(&file) {

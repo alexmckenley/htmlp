@@ -1,5 +1,4 @@
-//! Strict, self-contained prompt files. The default library depends only on
-//! `xmlparser`; token counting is an injected [`TokenCounter`]. Enable `tokens`
+//! Strict, self-contained prompt files. The default library uses `xmlparser` and `sha2`; token counting is an injected [`TokenCounter`]. Enable `tokens`
 //! for CL100K, `json` for serialization, or `cli` for the standalone tool.
 //!
 //! ```
@@ -12,10 +11,12 @@ mod check;
 mod files;
 mod model;
 mod parser;
+mod signing;
 pub use check::{TokenCounter, lint, render};
-pub use files::{FileReport, check_path, parse_file};
+pub use files::{FileReport, check_path, parse_file, sign_path};
 pub use model::*;
 pub use parser::{parse, parse_limit};
+pub use signing::{budget_signature, sign_source};
 
 #[cfg(feature = "tokens")]
 mod tokenizer;
