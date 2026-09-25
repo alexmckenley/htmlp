@@ -22,6 +22,10 @@ Static checks defer variable-dependent budgets (tokens: null, deferred: true).
 render substitutes literal bindings and checks final file and section budgets.
 Inline limits and reasons are editable; policy changes need review.
 
+Runtime feature: attributed fragments, model requests, explicit estimates, reported usage.
+render_checked returns immutable text, measurements, and section provenance.
+No category attributes in markup yet.
+Runtime guide: {{BASE}}/runtime.md
 Guide: {{BASE}}/docs/
 Specification: {{BASE}}/spec.md
 Schema: {{BASE}}/document.schema.json

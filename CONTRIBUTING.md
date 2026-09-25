@@ -13,6 +13,8 @@ cargo test --locked --no-default-features
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo run --locked --features cli -- check examples
 cargo run --locked --example schema --features schema > schema/document.schema.json
+cargo run --locked --example runtime_schema --features schema,runtime -- request > schema/request.schema.json
+cargo run --locked --example runtime_schema --features schema,runtime -- usage > schema/usage.schema.json
 python3 site/build.py
 ```
 

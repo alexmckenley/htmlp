@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-alpha.4
+
+- Add optional `htmlp::runtime`: attributed prompt fragments, roles, tool/image/reasoning blocks, model requests, and source categories.
+- Separate categorized request estimates from provider-reported usage; represent unavailable attribution explicitly.
+- Unify source rounding and image reserves in `ByteEstimator`; add distinct stream-snapshot merging and per-call aggregation.
+- Add immutable `render_checked` output with tokenizer measurements, checked section selection, and non-overlapping provenance spans.
+- Generate request and usage JSON schemas alongside the file AST schema.
+
 ## 0.2.0-alpha.3
 
 - Add `htmlp sign PATH` and short `sig` budget checksums covering `max-tokens`, `per-item`, and `reason`.

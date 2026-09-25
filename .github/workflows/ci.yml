@@ -19,5 +19,7 @@ jobs:
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo run --locked --features cli -- check examples
       - run: cargo run --locked --example schema --features schema > schema/document.schema.json
-      - run: git diff --exit-code -- schema/document.schema.json
+      - run: cargo run --locked --example runtime_schema --features schema,runtime -- request > schema/request.schema.json
+      - run: cargo run --locked --example runtime_schema --features schema,runtime -- usage > schema/usage.schema.json
+      - run: git diff --exit-code -- schema
       - run: cargo package --locked --no-verify
