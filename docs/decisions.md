@@ -2,7 +2,7 @@
 
 ## Small vocabulary, self-contained files
 
-Three elements are sufficient: `htmlp`, `section`, `var`. IDs handle semantic selection without inventing provider-specific roles. Sections can contain Markdown and nested sections. Every limit requires a nearby reason so an editor can understand why it exists. This encourages adherence but does not prevent policy edits.
+Two elements are sufficient: `htmlp` and `section`. Named string placeholders use `{{name}}`. Variables carry no budgets; checks involving them are deferred until rendering. IDs handle semantic selection without inventing provider-specific roles. Sections can contain Markdown and nested sections. Every limit requires a nearby reason so an editor can understand why it exists. This encourages adherence but does not prevent policy edits.
 
 No top-level configuration or directory inheritance in 0.2. Running on a directory simply checks its files independently. Composition into an agent's context remains the caller's responsibility.
 

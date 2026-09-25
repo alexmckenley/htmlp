@@ -1,6 +1,6 @@
 use htmlp::{Bindings, Cl100k, Diagnostic, check_path, lint, parse_file, render};
 use std::{env, fs, path::Path, process::ExitCode};
-const HELP: &str = "HTMLP — Token limits for prompt files.\n\nhtmlp check PATH [--json]\nhtmlp parse FILE\nhtmlp compile FILE\nhtmlp render FILE [--vars bindings.json]\nhtmlp watch PATH\n\ncheck recursively validates .htmlp files independently. No repository config.\ncompile emits a checked JSON AST; render emits checked, substituted text.\nExit: 0 success, 1 file validation errors, 2 usage or operational errors.\n";
+const HELP: &str = "HTMLP — Token limits for prompt files.\n\nhtmlp check PATH [--json]\nhtmlp parse FILE\nhtmlp compile FILE\nhtmlp render FILE [--vars bindings.json]\nhtmlp watch PATH\n\ncheck recursively validates .htmlp files independently. No repository config.\ncompile checks static budgets and emits JSON; variable-dependent budgets require render.\nExit: 0 success, 1 file validation errors, 2 usage or operational errors.\n";
 fn emit(file: &str, diagnostics: &[Diagnostic]) {
     for d in diagnostics {
         eprintln!(
@@ -142,7 +142,19 @@ fn run() -> Result<u8, String> {
                 emit(&r.file.display().to_string(), &r.report.diagnostics);
             }
             if !failed {
-                println!("HTMLP OK: {} file(s)", reports.len());
+                let deferred = reports
+                    .iter()
+                    .flat_map(|r| &r.report.measurements)
+                    .filter(|m| m.deferred && m.limit.is_some())
+                    .count();
+                if deferred == 0 {
+                    println!("HTMLP OK: {} file(s)", reports.len());
+                } else {
+                    println!(
+                        "HTMLP OK: {} file(s); {deferred} budget(s) deferred until render",
+                        reports.len()
+                    );
+                }
             }
         }
         return Ok(u8::from(failed));
