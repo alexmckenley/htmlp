@@ -3,43 +3,76 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>htmlp — Keep your agent context in check.</title>
+<title>htmlp — Stop the Slop.</title>
 <meta name="description" content="Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.">
 <link rel="stylesheet" href="{{BASE}}/style.css">
 </head>
-<body>
+<body class="home">
 <header class="home-header"><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
-<h1>htmlp</h1>
-<p class="lead">Keep your agent context in check.</p>
-<p>Token limits for prompt files. Typed Rust prompts and categorized usage for agent context and skills.</p>
-<p>Give each budget a reason. Check files before loading them, and track where your context comes from at runtime.</p>
-<h2>Write a prompt file</h2>
-<p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Write Markdown inside sections.</p>
-<pre><code>&lt;htmlp max-tokens="2k" reason="Loaded on every request."&gt;
-&lt;section id="workflow" max-tokens="500" reason="Keep routine steps short."&gt;
+<section class="intro" aria-labelledby="title">
+<h1 id="title">htmlp</h1>
+<p class="lead">Stop the Slop.</p>
+<p class="summary">Set clear limits for agent instructions and skills. Build typed prompts in Rust, and track where your context comes from.</p>
+</section>
+<section class="feature" aria-labelledby="files">
+<div>
+<h2 id="files">A budget. A reason.</h2>
+<p>Save instructions as <code>.htmlp</code>. Give each token limit a reason, and write Markdown inside sections.</p>
+<p>The file sets the overall budget. Sections keep individual instructions focused.</p>
+<p><a href="{{BASE}}/docs/#files">Explore the format →</a></p>
+</div>
+<figure class="code-sample">
+<figcaption>rules.htmlp</figcaption>
+<pre><code>&lt;htmlp max-tokens="2k" reason="Loaded every turn."&gt;
+&lt;section id="workflow" max-tokens="500"
+  reason="Keep routine steps short."&gt;
 Read the code. Make one change. Run its tests.
 &lt;/section&gt;
 &lt;/htmlp&gt;</code></pre>
-<h2>Sign and check</h2>
-<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
+</figure>
+</section>
+<section class="feature" aria-labelledby="check">
+<div>
+<h2 id="check">Sign once. Check every change.</h2>
+<p>Sign intentional budgets. Catch exceeded limits, missing reasons, and changed budget signatures before loading a file.</p>
+<p>Each file is independent. No repository configuration required.</p>
+<p class="detail">Content edits need only a check. Re-sign when a budget changes.</p>
+</div>
+<figure class="code-sample">
+<figcaption>Terminal</figcaption>
+<pre><code>cargo install \
+  --git https://github.com/alexmckenley/htmlp \
+  --tag v0.2.0-alpha.4 --features cli
+
 htmlp sign ./prompts
 htmlp check ./prompts</code></pre>
-<p><code>2k</code> means 2,000 tokens. The checker reports invalid markup, missing reasons, changed budget signatures, and exceeded limits. Each file is independent; no repository configuration is needed.</p>
-<p>Signing records each limit and its reason in a short <code>sig</code>. Re-sign intentional budget changes; content edits need only a check.</p>
-<h2>Build typed prompts in Rust</h2>
-<p>Use the <code>runtime</code> feature with or without prompt files. Each fragment has an explicit source and role; request estimates stay separate from provider-reported usage.</p>
-<pre><code>use htmlp::runtime::{ContentSource, ModelRequest, PromptFragment, Role};
+</figure>
+</section>
+<section class="feature" aria-labelledby="rust">
+<div>
+<h2 id="rust">Know what goes into a request.</h2>
+<p>Give every fragment a source and role. Track usage by category, keeping estimates separate from provider-reported counts.</p>
+<p>Use the Rust <code>runtime</code> feature with or without prompt files.</p>
+<p><a href="{{BASE}}/docs/runtime/">Use the Rust interface →</a></p>
+</div>
+<figure class="code-sample">
+<figcaption>Rust</figcaption>
+<pre><code>use htmlp::runtime::{
+    ContentSource, ModelRequest, PromptFragment, Role,
+};
 
 let request = ModelRequest::builder("my-model")
     .fragment(PromptFragment::text(
-        ContentSource::SystemPrompt, Role::System, "Review the change.",
+        ContentSource::SystemPrompt,
+        Role::System,
+        "Review the change.",
     ))
     .build();
 let estimate = request.estimate();</code></pre>
-<p><a href="{{BASE}}/docs/runtime/">Use the Rust interface →</a></p>
-<p><a href="{{BASE}}/docs/">Read the documentation →</a></p>
+</figure>
+</section>
 </main>
-<footer>HTMLP 0.2 · Alpha · <a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">MIT license</a></footer>
+<footer><span>HTMLP 0.2 · Alpha</span><a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">Open source · MIT license</a></footer>
 </body>
 </html>
