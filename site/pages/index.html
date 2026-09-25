@@ -11,8 +11,8 @@
 <header class="home-header"><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="{{BASE}}/docs/runtime/">Rust guide</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
 <main>
 <h1>htmlp</h1>
-<p class="lead">Statically enforceable token limits for agent context files</p>
-<p>Give each budget a reason. Check files before loading them, and track where your context comes from at runtime.</p>
+<p class="lead">Statically enforceable token limits for context files</p>
+<p>Agents write their own skills. Context fills with slop. Prompts grow unbounded. HTMLP enforces a token budget, pushing agents to decide what belongs, what to cut, and when a larger budget needs justification.</p>
 <h2>Write a prompt file</h2>
 <p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Write Markdown inside sections.</p>
 <pre><code>&lt;htmlp max-tokens="2k" reason="Loaded on every request."&gt;
