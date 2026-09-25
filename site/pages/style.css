@@ -15,7 +15,6 @@
 }
 * { box-sizing: border-box; }
 body { max-width: 860px; margin: 0 auto; padding: 0 32px; }
-body.home { max-width: 1100px; }
 header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; min-height: 80px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .home-header { justify-content: flex-end; }
 a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -48,25 +47,16 @@ th { color: var(--ink); font-weight: 600; }
 th:first-child { width: 40%; }
 [id] { scroll-margin-top: 24px; }
 .home main { padding-top: 0; }
-.intro { padding: 60px 0 52px; }
+.home footer { display: block; }
+.intro { padding: 60px 0 12px; }
 .intro h1 { font: 600 64px/1.1 var(--mono); margin: 0 0 24px; }
 .intro .lead { font-size: 30px; font-weight: 500; line-height: 1.3; margin: 0 0 16px; }
 .intro .summary { max-width: 620px; color: var(--muted); font-size: 17px; margin: 0; }
-.feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr); align-items: start; gap: 48px; padding: 36px 0; border-top: 1px solid var(--line); }
-.feature h2 { font-size: 20px; margin: 0 0 12px; }
-.feature p { color: var(--muted); font-size: 15px; margin: 12px 0; }
-.feature .detail { font-size: 13px; }
-.feature a { font-weight: 500; }
-.code-sample { min-width: 0; margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #f7f8fa; }
-.code-sample figcaption { padding: 10px 20px; border-bottom: 1px solid var(--line); color: var(--muted); background: #fafbfc; font: 12px/1.5 var(--mono); }
-.code-sample pre { border: 0; border-radius: 0; margin: 0; padding: 20px; }
 @media (max-width: 760px) {
   body { padding: 0 24px; }
-  .intro { padding: 44px 0 36px; }
+  .intro { padding: 44px 0 12px; }
   .intro h1 { font-size: 54px; }
   .intro .lead { font-size: 26px; }
-  .feature { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 28px 0; }
-  .feature p { max-width: 580px; }
 }
 @media (max-width: 420px) {
   body { padding: 0 20px; }
@@ -77,6 +67,6 @@ th:first-child { width: 40%; }
   .intro h1 { font-size: 48px; }
   .intro .lead { font-size: 24px; }
   .intro .summary { font-size: 16px; }
-  pre, .code-sample pre { padding: 16px; }
+  pre { padding: 16px; }
   pre { font-size: 12px; }
 }
