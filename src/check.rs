@@ -1,5 +1,5 @@
 use crate::{Bindings, Diagnostic, Document, Limits, Measurement, Node, Position, Report};
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 /// Inject a tokenizer to keep the parser independent of large vocabulary tables.
 /// `name` must match the document's tokenizer identifier. Implementations must
@@ -11,7 +11,7 @@ pub trait TokenCounter {
 
 enum Piece {
     Text(String),
-    Reserved(u64),
+    Unbound,
 }
 fn extend(into: &mut Vec<Piece>, from: Vec<Piece>) {
     for piece in from {
@@ -22,15 +22,24 @@ fn extend(into: &mut Vec<Piece>, from: Vec<Piece>) {
     }
 }
 fn size(pieces: &[Piece], counter: &impl TokenCounter) -> Option<u64> {
-    pieces.iter().try_fold(0u64, |n, p| {
-        n.checked_add(match p {
-            Piece::Text(s) => counter.count(s),
-            Piece::Reserved(n) => *n,
-        })
-    })
+    // Adjacent literal runs are always merged. Without variables there is
+    // either one complete string or an empty subtree.
+    if pieces.iter().any(|p| matches!(p, Piece::Unbound)) {
+        return None;
+    }
+    Some(
+        pieces
+            .iter()
+            .map(|p| match p {
+                Piece::Text(s) => counter.count(s),
+                Piece::Unbound => 0,
+            })
+            .sum(),
+    )
 }
+
 fn require_reason(limits: &Limits, position: Position, errors: &mut Vec<Diagnostic>) {
-    if (limits.max_tokens.is_some() || limits.max_item_tokens.is_some())
+    if (limits.max_tokens.is_some() || limits.per_item.is_some())
         && limits.reason.as_ref().is_none_or(|r| r.trim().is_empty())
     {
         errors.push(Diagnostic::new(
@@ -61,15 +70,15 @@ fn validate(doc: &Document, counter: &impl TokenCounter) -> Vec<Diagnostic> {
             doc.position,
         ));
     }
-    let mut ids = BTreeSet::new();
+    let mut ids = BTreeMap::new();
     fn walk(
         nodes: &[Node],
-        ids: &mut BTreeSet<String>,
+        ids: &mut BTreeMap<String, bool>,
         depth: usize,
         errors: &mut Vec<Diagnostic>,
     ) {
         for node in nodes {
-            if !matches!(node, Node::Text { .. }) && depth > 64 {
+            if matches!(node, Node::Section(_)) && depth > 64 {
                 errors.push(Diagnostic::new(
                     "depth",
                     "Maximum element depth is 64",
@@ -84,19 +93,14 @@ fn validate(doc: &Document, counter: &impl TokenCounter) -> Vec<Diagnostic> {
                     walk(&s.children, ids, depth + 1, errors);
                     (s.id.as_deref(), s.position)
                 }
-                Node::Variable(v) => {
-                    if v.reason.trim().is_empty() {
-                        errors.push(Diagnostic::new(
-                            "reason",
-                            "A variable bound requires a nonblank reason",
-                            v.position,
-                        ));
-                    }
-                    (Some(v.id.as_str()), v.position)
-                }
+                Node::Variable(v) => (Some(v.id.as_str()), v.position),
             };
             if let Some(id) = id {
-                if !crate::parser::valid_id(id) || !ids.insert(id.to_string()) {
+                let variable = matches!(node, Node::Variable(_));
+                let previous = ids.insert(id.to_string(), variable);
+                if !crate::parser::valid_id(id)
+                    || previous.is_some_and(|was_variable| !(variable && was_variable))
+                {
                     errors.push(Diagnostic::new(
                         "id",
                         format!("Invalid or duplicate ID: {id}"),
@@ -124,36 +128,28 @@ impl<C: TokenCounter> Analyzer<'_, C> {
         reason: Option<&str>,
     ) {
         let tokens = size(pieces, self.counter);
-        let reserved = pieces.iter().any(|p| matches!(p, Piece::Reserved(_)));
-        match tokens {
-            None => self.report.diagnostics.push(Diagnostic::new(
-                "overflow",
-                "Token reservations overflow u64",
-                position,
-            )),
-            Some(tokens) => {
-                if cap.is_some_and(|limit| tokens > limit) {
-                    self.report.diagnostics.push(Diagnostic::new(
-                        "budget",
-                        format!(
-                            "{}: {tokens} tokens exceeds {} — {}",
-                            id.unwrap_or("document/section"),
-                            cap.unwrap(),
-                            reason.unwrap_or("inherited item limit")
-                        ),
-                        position,
-                    ));
-                }
-                self.report.measurements.push(Measurement {
-                    id: id.map(str::to_string),
-                    tokens,
-                    limit: cap,
-                    reserved,
-                    reason: reason.map(str::to_string),
-                });
+        if let (Some(tokens), Some(limit)) = (tokens, cap) {
+            if tokens > limit {
+                self.report.diagnostics.push(Diagnostic::new(
+                    "budget",
+                    format!(
+                        "{}: {tokens} tokens exceeds {limit} — {}",
+                        id.unwrap_or("document/section"),
+                        reason.unwrap_or("inherited item limit")
+                    ),
+                    position,
+                ));
             }
         }
+        self.report.measurements.push(Measurement {
+            id: id.map(str::to_string),
+            tokens,
+            limit: cap,
+            deferred: tokens.is_none(),
+            reason: reason.map(str::to_string),
+        });
     }
+
     fn content(
         &mut self,
         nodes: &[Node],
@@ -168,7 +164,7 @@ impl<C: TokenCounter> Analyzer<'_, C> {
                 Node::Text { value } => extend(&mut pieces, vec![Piece::Text(value.clone())]),
                 Node::Section(s) => {
                     let inherited = limits
-                        .max_item_tokens
+                        .per_item
                         .map(|cap| (cap, limits.reason.as_deref().unwrap_or_default()));
                     let child = self.content(
                         &s.children,
@@ -193,15 +189,8 @@ impl<C: TokenCounter> Analyzer<'_, C> {
                             }
                         }
                     } else {
-                        Piece::Reserved(v.max_tokens)
+                        Piece::Unbound
                     };
-                    self.measure(
-                        std::slice::from_ref(&piece),
-                        Some(v.max_tokens),
-                        Some(&v.id),
-                        v.position,
-                        Some(&v.reason),
-                    );
                     extend(&mut pieces, vec![piece]);
                 }
             }
@@ -217,9 +206,8 @@ impl<C: TokenCounter> Analyzer<'_, C> {
     }
 }
 
-/// Check every declared budget. Static text is counted exactly after concatenation.
-/// Unbound variables reserve their declared allowance; BPE is not additive at
-/// interpolation boundaries, so final substituted content must also be checked.
+/// Check fully static subtrees exactly. Subtrees containing variables are
+/// reported as deferred, with no guessed count. Render to check their budgets.
 pub fn lint(doc: &Document, counter: &impl TokenCounter) -> Report {
     let diagnostics = validate(doc, counter);
     if !diagnostics.is_empty() {
@@ -237,8 +225,9 @@ pub fn lint(doc: &Document, counter: &impl TokenCounter) -> Report {
     analyzer.report
 }
 
-/// Validate static reservations, substitute inert strings, then recount every
-/// final subtree and variable. No output is returned on any error.
+/// Validate static content, substitute inert strings, then check every final
+/// file and section budget. Variables have no separate limit. No output is
+/// returned on any error.
 pub fn render(
     doc: &Document,
     bindings: &Bindings,

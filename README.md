@@ -19,7 +19,7 @@ Save as `rules.htmlp`. `2k` means 2,000 tokens. Every declared limit requires a 
 Requires a Rust toolchain. This alpha is distributed through GitHub; it is not published to crates.io.
 
 ```sh
-cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.1 --features cli
+cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.2 --features cli
 htmlp check ./prompts
 ```
 
@@ -38,13 +38,13 @@ htmlp render request.htmlp --vars values.json
 
 - `<htmlp>` is the single root; `max-tokens` and `reason` are required.
 - `<section>` groups Markdown. Optional `id` supports lookup. Optional `max-tokens` bounds its full text, including descendants.
-- `max-item-tokens` on a root or section caps each direct child section. A child's own smaller limit still applies.
-- `<var id="question" max-tokens="500" reason="Bound caller input."></var>` reserves a named string slot.
+- `per-item` on a root or section caps each direct child section. For example, `max-tokens="10k" per-item="1k" reason="Keep checks concise."` caps the total at 10,000 tokens and each item at 1,000. A child's own smaller limit still applies.
+- `{{question}}` inserts a named string value. Variables have no limits or attributes; repeated names reuse the same binding.
 - One `reason` explains the limits declared on that element. Reasons are metadata, excluded from rendered text.
 
-All tags are lowercase with explicit closing tags and quoted attributes. Escape literal `<` and `&`, even in Markdown fences. Whitespace is preserved. Unknown syntax fails instead of being repaired like browser HTML.
+Tags are lowercase with quoted attributes. Use matching end tags, or self-close an empty element: `<section id="notes" />`. Escape literal `<` and `&`, even in Markdown fences. Write `&#123;&#123;name}}` to keep a literal `{{name}}`. Whitespace is preserved. Unknown syntax fails instead of being repaired like browser HTML.
 
-Budgets count rendered text with `cl100k_base`, not characters or guessed tokens. The encoding can differ from your model's tokenizer. Variable allowances are checked statically; `render` also checks bound values and final text because token counts are not additive across interpolation boundaries. Limits do not include SDK role wrappers or other provider overhead.
+Budgets count rendered text with `cl100k_base`, not characters or guessed tokens. The encoding can differ from your model's tokenizer. Static checks defer budgets for subtrees containing variables; `render` checks their final text after substitution. Deferred measurements have `tokens: null` and `deferred: true`. Limits do not include SDK role wrappers or other provider overhead.
 
 ## Rust API
 

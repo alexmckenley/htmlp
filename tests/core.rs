@@ -59,9 +59,9 @@ fn preserves_markdown_unicode_and_whitespace() {
 #[test]
 fn strict_syntax_rejects_browser_repair_and_xml_extensions() {
     let bad = [
+        "<htmlp max-tokens='1k' max-item-tokens='100' reason='Shared.'></htmlp>",
         "",
         "<htmlp></htmlp>",
-        "<htmlp max-tokens='1k' reason='x'/>",
         "<!DOCTYPE html><htmlp max-tokens='1k' reason='x'></htmlp>",
         "<?xml version='1.0'?><htmlp max-tokens='1k' reason='x'></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><section></htmlp>",
@@ -74,7 +74,7 @@ fn strict_syntax_rejects_browser_repair_and_xml_extensions() {
         "<htmlp max-tokens='1k' reason='x'>&#128;</htmlp>",
         "<htmlp max-tokens='1k' reason='x'>a & b</htmlp>",
         "<htmlp max-tokens='1k' reason='x'><section id='x'></section><section id='x'></section></htmlp>",
-        "<htmlp max-tokens='1k' reason='x'><var id='x' max-tokens='1' reason='x'> </var></htmlp>",
+        "<htmlp max-tokens='1k' reason='x'><var id='x'> </var></htmlp>",
         "<htmlp max-tokens='1k' reason='x'><htmlp></htmlp></htmlp>",
         "<htmlp max-tokens='1k' reason='x' version='99'></htmlp>",
         "<htmlp max-tokens='1k' reason='x'>\0</htmlp>",
@@ -89,8 +89,7 @@ fn every_declared_limit_needs_its_own_reason() {
         "<htmlp max-tokens='1k'></htmlp>",
         "<htmlp max-tokens='1k' reason='  '></htmlp>",
         "<htmlp max-tokens='1k' reason='Root.'><section max-tokens='1'></section></htmlp>",
-        "<htmlp max-tokens='1k' reason='Root.'><section max-item-tokens='1'></section></htmlp>",
-        "<htmlp max-tokens='1k' reason='Root.'><var id='x' max-tokens='1'></var></htmlp>",
+        "<htmlp max-tokens='1k' reason='Root.'><section per-item='1'></section></htmlp>",
     ] {
         assert_eq!(parse(source).unwrap_err().code, "reason");
     }
@@ -105,7 +104,7 @@ fn every_declared_limit_needs_its_own_reason() {
 #[test]
 fn independent_nested_limits_keep_the_correct_reasons() {
     let d = document(
-        "<section id='list' max-item-tokens='10' reason='Parent cap.'><section id='child' max-item-tokens='2' reason='Child cap.'><section id='grandchild'>abc</section></section></section>",
+        "<section id='list' per-item='10' reason='Parent cap.'><section id='child' per-item='2' reason='Child cap.'><section id='grandchild'>abc</section></section></section>",
     );
     let r = lint(&d, &Scalars);
     let grand = r
@@ -131,14 +130,12 @@ fn independent_nested_limits_keep_the_correct_reasons() {
 }
 #[test]
 fn item_limits_do_not_apply_to_variables_or_plain_text() {
-    let d = document(
-        "<section max-item-tokens='0' reason='No child content.'>abc<var id='v' max-tokens='5' reason='Caller input.'></var></section>",
-    );
+    let d = document("<section per-item='0' reason='No child content.'>abc{{v}}</section>");
     assert!(lint(&d, &Scalars).is_ok());
 }
 #[test]
 fn static_and_runtime_budgets_are_both_enforced() {
-    let mut d = document("a<var id='v' max-tokens='3' reason='Caller input.'></var>");
+    let mut d = document("a{{v}}");
     d.limits.max_tokens = Some(4);
     assert!(lint(&d, &Scalars).is_ok());
     let mut bindings = Bindings::new();
@@ -149,12 +146,12 @@ fn static_and_runtime_budgets_are_both_enforced() {
     assert!(render(&d, &bindings, &Scalars).is_err());
     d.limits.max_tokens = Some(3);
     bindings.insert("v".into(), "".into());
-    assert!(render(&d, &bindings, &Scalars).is_err());
+    assert_eq!(render(&d, &bindings, &Scalars).unwrap(), "a");
     assert_eq!(d.to_string(), "a{{v}}");
 }
 #[test]
 fn substitution_is_literal_and_cannot_change_the_tree() {
-    let d = document("<var id='v' max-tokens='100' reason='Caller input.'></var>");
+    let d = document("{{v}}");
     let value = "</htmlp><section max-tokens='0'>";
     let bindings = Bindings::from([("v".into(), value.into())]);
     assert_eq!(render(&d, &bindings, &Scalars).unwrap(), value);
@@ -170,12 +167,15 @@ fn final_counts_are_not_assumed_additive() {
             if s == "ab" { 3 } else { s.len() as u64 }
         }
     }
-    let mut d = document("a<var id='v' max-tokens='1' reason='Caller input.'></var>");
+    let mut d = document("a{{v}}");
     d.limits.max_tokens = Some(2);
     assert!(lint(&d, &Boundary).is_ok());
     assert!(render(&d, &Bindings::from([("v".into(), "b".into())]), &Boundary).is_err());
     let d = document("<section>a</section><section>b</section>");
-    assert_eq!(lint(&d, &Boundary).measurements.last().unwrap().tokens, 3);
+    assert_eq!(
+        lint(&d, &Boundary).measurements.last().unwrap().tokens,
+        Some(3)
+    );
 }
 #[test]
 fn constructors_and_ids_are_typed_and_validated() {
@@ -274,4 +274,90 @@ fn unicode_positions_use_scalars_and_byte_offsets() {
     let offset = source.find("<section").unwrap();
     assert_eq!(section.offset, offset);
     assert_eq!(section.column, source[..offset].chars().count() + 1);
+}
+
+#[test]
+fn variables_only_accept_ids_and_static_counts_are_deferred() {
+    for source in [
+        "{{}}",
+        "{{ v }}",
+        "{{v",
+        "{{v max-tokens=1k}}",
+        "<var id='v' />",
+    ] {
+        assert!(
+            parse(&format!(
+                "<htmlp max-tokens='1k' reason='Shared.'>{source}</htmlp>"
+            ))
+            .is_err()
+        );
+    }
+    let d = document("<section id='dynamic'>{{v}}</section><section id='static'>abc</section>");
+    let report = lint(&d, &Scalars);
+    assert!(report.is_ok());
+    assert_eq!(report.measurements.iter().filter(|m| m.deferred).count(), 2);
+    assert!(
+        report
+            .measurements
+            .iter()
+            .filter(|m| m.deferred)
+            .all(|m| m.tokens.is_none())
+    );
+    assert_eq!(
+        report
+            .measurements
+            .iter()
+            .find(|m| m.id.as_deref() == Some("static"))
+            .unwrap()
+            .tokens,
+        Some(3)
+    );
+}
+#[test]
+fn self_closing_elements_keep_tree_structure_and_validation() {
+    let d = document("<section id='empty' />{{v}}<section id='after'>End.</section>");
+    assert_eq!(d.to_string(), "{{v}}End.");
+    assert_eq!(d.sections().len(), 2);
+    assert!(parse("<htmlp max-tokens='1k' reason='Shared.' />").is_ok());
+    assert!(parse("<htmlp max-tokens='1k' reason='Shared.'><var /></htmlp>").is_err());
+    assert!(
+        parse("<htmlp max-tokens='1k' reason='Shared.'>{{v}}<section id='v' /></htmlp>").is_err()
+    );
+}
+#[test]
+fn per_item_is_enforced_after_binding() {
+    let d =
+        document("<section per-item='2' reason='Brief items.'><section>{{v}}</section></section>");
+    assert!(lint(&d, &Scalars).is_ok());
+    assert!(render(&d, &Bindings::from([("v".into(), "abc".into())]), &Scalars).is_err());
+}
+#[cfg(feature = "json")]
+#[test]
+fn variable_json_rejects_limits() {
+    let d = document("{{v}}");
+    for key in ["max_tokens", "per_item", "limits", "reason"] {
+        let mut value = serde_json::to_value(&d).unwrap();
+        value["children"][0][key] = serde_json::json!(10);
+        assert!(serde_json::from_value::<Document>(value).is_err(), "{key}");
+    }
+}
+
+#[test]
+fn repeated_variables_escape_literals_and_do_not_reparse_values() {
+    let d = document("{{name}} / {{name}} / &#123;&#123;name}} / <!-- {{ignored}} -->");
+    assert!(lint(&d, &Scalars).is_ok());
+    let result = render(
+        &d,
+        &Bindings::from([("name".into(), "{{other}}".into())]),
+        &Scalars,
+    )
+    .unwrap();
+    assert_eq!(result, "{{other}} / {{other}} / {{name}} / ");
+    assert!(
+        parse("<htmlp max-tokens='1k' reason='Shared.'><section id='v'>{{v}}</section></htmlp>")
+            .is_err()
+    );
+    assert!(
+        parse("<htmlp max-tokens='1k' reason='Shared.'>{{v}}<section id='v' /></htmlp>").is_err()
+    );
 }

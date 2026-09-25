@@ -1,0 +1,4 @@
+<htmlp max-tokens="10k" per-item="1k" reason="Keep checks concise.">
+<section id="test">Run the affected tests.</section>
+<section id="commit">Explain the change.</section>
+</htmlp>

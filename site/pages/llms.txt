@@ -8,12 +8,14 @@ Save as .htmlp:
 </htmlp>
 
 Check: htmlp check ./prompts
-Every declared max-tokens or max-item-tokens requires a nonblank reason on that element.
+Every declared max-tokens or per-item requires a nonblank reason on that element.
 Each file is independent; no external configuration or directory inheritance.
 1k = 1000 tokens. Default encoding: cl100k_base, not a universal model tokenizer.
-Use section IDs for lookup. var needs id, max-tokens, reason, and an explicit closing tag.
+Use section IDs for lookup. Variables use {{name}}, with no limits or attributes.
+Repeated variable names reuse a binding. Empty elements may self-close.
 Escape literal < and & in Markdown. Unknown markup fails.
-render checks static reservations, bindings, and final text.
+Static checks defer variable-dependent budgets (tokens: null, deferred: true).
+render substitutes literal bindings and checks final file and section budgets.
 Inline limits and reasons are editable; policy changes need review.
 
 Guide: {{BASE}}/docs/

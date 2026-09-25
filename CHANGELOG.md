@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0-alpha.2
+
+- Rename `max-item-tokens` to `per-item`, and the Rust/JSON field to `per_item`.
+- Use `max-tokens="10k" per-item="1k" reason="Keep checks concise."` for a total budget and per-item cap.
+- Replace the `var` element with `{{name}}` placeholders; variables have no limits in markup, Rust types, or JSON.
+- Defer variable-dependent counts until rendering; report them as `tokens: null`, `deferred: true`.
+- Support self-closing empty elements. The previous item-limit attribute is rejected.
+
 ## 0.2.0-alpha.1
 
 Breaking Rust rewrite of the experimental format.

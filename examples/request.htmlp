@@ -1,3 +1,3 @@
 <htmlp max-tokens="1k" reason="Request context.">
-Answer: <var id="question" max-tokens="500" reason="Bound caller input."></var>
+Answer: {{question}}
 </htmlp>

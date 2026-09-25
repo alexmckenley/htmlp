@@ -149,10 +149,10 @@ fn limits(frame: &Frame) -> Result<Limits, Diagnostic> {
     };
     let limits = Limits {
         max_tokens: get("max-tokens")?,
-        max_item_tokens: get("max-item-tokens")?,
+        per_item: get("per-item")?,
         reason: frame.attrs.get("reason").cloned(),
     };
-    if (limits.max_tokens.is_some() || limits.max_item_tokens.is_some())
+    if (limits.max_tokens.is_some() || limits.per_item.is_some())
         && limits.reason.as_ref().is_none_or(|r| r.trim().is_empty())
     {
         return Err(Diagnostic::new(
@@ -171,9 +171,9 @@ fn append(nodes: &mut Vec<Node>, text: String) {
     }
 }
 
-/// Parse a strict HTML-compatible subset using a tested XML tokenizer. XML-only
-/// constructs, namespaces, self-closing tags, unknown names, and implicit repair
-/// are rejected. Markdown indentation is preserved, not inferred or rewritten.
+/// Parse strict HTML-inspired markup using a tested XML tokenizer. XML-only
+/// constructs, namespaces, unknown names, and implicit repair are rejected.
+/// Empty elements may use self-closing tags. Markdown indentation is preserved, not inferred or rewritten.
 pub fn parse(source: &str) -> Result<Document, Diagnostic> {
     if source.len() > 4 * 1024 * 1024 {
         return Err(Diagnostic::new(
@@ -194,6 +194,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
     let mut pending: Option<Frame> = None;
     let mut result = None;
     let mut ids = BTreeSet::new();
+    let mut variables = BTreeSet::new();
     for token in Tokenizer::from(source) {
         let token = token.map_err(|e| {
             Diagnostic::new(
@@ -209,10 +210,10 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                 span,
             } => {
                 let p = locations.at(span.start());
-                if !prefix.is_empty() || !matches!(local.as_str(), "htmlp" | "section" | "var") {
+                if !prefix.is_empty() || !matches!(local.as_str(), "htmlp" | "section") {
                     return Err(Diagnostic::new(
                         "element",
-                        "Only lowercase htmlp, section, and var are supported",
+                        "Only lowercase htmlp and section are supported",
                         p,
                     ));
                 }
@@ -227,9 +228,6 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                         "Expected exactly one htmlp root",
                         p,
                     ));
-                }
-                if stack.last().is_some_and(|f| f.name == "var") {
-                    return Err(Diagnostic::new("variable", "var must be empty", p));
                 }
                 pending = Some(Frame {
                     name: local.to_string(),
@@ -248,15 +246,9 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     Diagnostic::new("syntax", "Unexpected attribute", locations.at(span.start()))
                 })?;
                 let allowed: &[&str] = match frame.name.as_str() {
-                    "htmlp" => &[
-                        "version",
-                        "tokenizer",
-                        "max-tokens",
-                        "max-item-tokens",
-                        "reason",
-                    ],
-                    "section" => &["id", "max-tokens", "max-item-tokens", "reason"],
-                    _ => &["id", "max-tokens", "reason"],
+                    "htmlp" => &["version", "tokenizer", "max-tokens", "per-item", "reason"],
+                    "section" => &["id", "max-tokens", "per-item", "reason"],
+                    _ => &["id"],
                 };
                 if !prefix.is_empty() || !allowed.contains(&local.as_str()) {
                     return Err(Diagnostic::new(
@@ -275,15 +267,8 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     ));
                 }
             }
-            Token::ElementEnd { end, span } => match end {
-                ElementEnd::Empty => {
-                    return Err(Diagnostic::new(
-                        "syntax",
-                        "Use explicit closing tags, including </var>",
-                        locations.at(span.start()),
-                    ));
-                }
-                ElementEnd::Open => {
+            Token::ElementEnd { end, span } => {
+                if matches!(end, ElementEnd::Open | ElementEnd::Empty) {
                     let frame = pending.take().ok_or_else(|| {
                         Diagnostic::new(
                             "syntax",
@@ -292,7 +277,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                         )
                     })?;
                     if let Some(id) = frame.attrs.get("id") {
-                        if !valid_id(id) || !ids.insert(id.clone()) {
+                        if !valid_id(id) || variables.contains(id) || !ids.insert(id.clone()) {
                             return Err(Diagnostic::new(
                                 "id",
                                 "IDs must be unique and contain only ASCII letters, digits, _, -, ., or :",
@@ -302,7 +287,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     }
                     stack.push(frame);
                 }
-                ElementEnd::Close(prefix, local) => {
+                if !matches!(end, ElementEnd::Open) {
                     let frame = stack.pop().ok_or_else(|| {
                         Diagnostic::new(
                             "syntax",
@@ -310,12 +295,14 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                             locations.at(span.start()),
                         )
                     })?;
-                    if !prefix.is_empty() || frame.name != local.as_str() {
-                        return Err(Diagnostic::new(
-                            "syntax",
-                            format!("Expected </{}>, found </{local}>", frame.name),
-                            locations.at(span.start()),
-                        ));
+                    if let ElementEnd::Close(prefix, local) = end {
+                        if !prefix.is_empty() || frame.name != local.as_str() {
+                            return Err(Diagnostic::new(
+                                "syntax",
+                                format!("Expected </{}>, found </{local}>", frame.name),
+                                locations.at(span.start()),
+                            ));
+                        }
                     }
                     let budget = limits(&frame)?;
                     if frame.name == "htmlp" {
@@ -353,31 +340,12 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                             position: frame.position,
                         });
                     } else {
-                        let node = if frame.name == "section" {
-                            Node::Section(Section {
-                                id: frame.attrs.get("id").cloned(),
-                                limits: budget,
-                                children: frame.children,
-                                position: frame.position,
-                            })
-                        } else {
-                            let id = frame.attrs.get("id").cloned().ok_or_else(|| {
-                                Diagnostic::new("variable", "var requires id", frame.position)
-                            })?;
-                            let max_tokens = budget.max_tokens.ok_or_else(|| {
-                                Diagnostic::new(
-                                    "variable",
-                                    "var requires max-tokens",
-                                    frame.position,
-                                )
-                            })?;
-                            Node::Variable(Variable {
-                                id,
-                                max_tokens,
-                                reason: budget.reason.unwrap_or_default(),
-                                position: frame.position,
-                            })
-                        };
+                        let node = Node::Section(Section {
+                            id: frame.attrs.get("id").cloned(),
+                            limits: budget,
+                            children: frame.children,
+                            position: frame.position,
+                        });
                         stack
                             .last_mut()
                             .ok_or_else(|| Diagnostic::new("root", "Missing root", frame.position))?
@@ -385,18 +353,42 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                             .push(node);
                     }
                 }
-            },
+            }
             Token::Text { text } => {
                 if let Some(frame) = stack.last_mut() {
-                    if frame.name == "var" {
-                        return Err(Diagnostic::new(
-                            "variable",
-                            "var must be empty, without whitespace",
-                            locations.at(text.start()),
-                        ));
+                    let raw = text.as_str();
+                    let mut cursor = 0;
+                    while let Some(relative) = raw[cursor..].find("{{") {
+                        let start = cursor + relative;
+                        let p = locations.at(text.start() + start);
+                        let end = raw[start + 2..]
+                            .find("}}")
+                            .map(|i| start + 2 + i)
+                            .ok_or_else(|| {
+                                Diagnostic::new("variable", "Unclosed {{name}} placeholder", p)
+                            })?;
+                        let id = &raw[start + 2..end];
+                        if !valid_id(id) || ids.contains(id) {
+                            return Err(Diagnostic::new(
+                                "variable",
+                                "Variable names must be valid IDs and cannot match a section ID",
+                                p,
+                            ));
+                        }
+                        let decoded = decode(&raw[cursor..start]).map_err(|e| {
+                            Diagnostic::new("entity", e, locations.at(text.start() + cursor))
+                        })?;
+                        append(&mut frame.children, decoded);
+                        variables.insert(id.to_string());
+                        frame.children.push(Node::Variable(Variable {
+                            id: id.to_string(),
+                            position: p,
+                        }));
+                        cursor = end + 2;
                     }
-                    let decoded = decode(text.as_str())
-                        .map_err(|e| Diagnostic::new("entity", e, locations.at(text.start())))?;
+                    let decoded = decode(&raw[cursor..]).map_err(|e| {
+                        Diagnostic::new("entity", e, locations.at(text.start() + cursor))
+                    })?;
                     append(&mut frame.children, decoded);
                 } else if !text.as_str().trim().is_empty() {
                     return Err(Diagnostic::new(
@@ -406,15 +398,7 @@ pub fn parse(source: &str) -> Result<Document, Diagnostic> {
                     ));
                 }
             }
-            Token::Comment { span, .. } => {
-                if stack.last().is_some_and(|f| f.name == "var") {
-                    return Err(Diagnostic::new(
-                        "variable",
-                        "var must be empty",
-                        locations.at(span.start()),
-                    ));
-                }
-            }
+            Token::Comment { .. } => {}
             _ => {
                 return Err(Diagnostic::new(
                     "syntax",

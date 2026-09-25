@@ -48,7 +48,7 @@ impl std::error::Error for Diagnostic {}
 pub struct Limits {
     pub max_tokens: Option<u64>,
     /// Applies to each direct child section; does not change grandchildren.
-    pub max_item_tokens: Option<u64>,
+    pub per_item: Option<u64>,
     /// Required, nonblank rationale whenever either limit is declared.
     pub reason: Option<String>,
 }
@@ -79,15 +79,18 @@ pub struct Section {
     pub position: Position,
 }
 
-/// An empty string slot with a token bound and its required reason.
+/// A named string slot: `{{question}}`. Variables have no limits.
+///
+/// ```compile_fail
+/// use htmlp::{Variable, Position};
+/// let slot = Variable { id: "question".into(), max_tokens: 100, position: Position::default() };
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "json", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json", serde(deny_unknown_fields))]
 pub struct Variable {
     pub id: String,
-    pub max_tokens: u64,
-    pub reason: String,
     pub position: Position,
 }
 
@@ -107,7 +110,8 @@ pub struct Document {
 /// Runtime values are strings; never expressions or reparsed markup.
 pub type Bindings = BTreeMap<String, String>;
 
-/// A typed reference returned by ID lookup.
+/// A typed reference returned by ID lookup. Repeated variable names return
+/// the first reference in source order.
 #[derive(Debug, Clone, Copy)]
 pub enum ElementRef<'a> {
     Section(&'a Section),
@@ -162,7 +166,7 @@ impl Document {
             tokenizer: "cl100k_base".into(),
             limits: Limits {
                 max_tokens: Some(max_tokens),
-                max_item_tokens: None,
+                per_item: None,
                 reason: Some(reason.into()),
             },
             children,
@@ -218,15 +222,16 @@ impl fmt::Display for ElementRef<'_> {
     }
 }
 
-/// Per-element measurement. `reserved` means variables have not been supplied.
+/// Per-element measurement. `tokens` is `None` and `deferred` is true when
+/// unbound variables prevent an exact count. Render to enforce those budgets.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "json", derive(serde::Serialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Measurement {
     pub id: Option<String>,
-    pub tokens: u64,
+    pub tokens: Option<u64>,
     pub limit: Option<u64>,
-    pub reserved: bool,
+    pub deferred: bool,
     pub reason: Option<String>,
 }
 #[derive(Debug, Clone, Default)]
@@ -237,6 +242,7 @@ pub struct Report {
     pub measurements: Vec<Measurement>,
 }
 impl Report {
+    /// No known errors; deferred measurements still require rendering.
     pub fn is_ok(&self) -> bool {
         self.diagnostics.is_empty()
     }

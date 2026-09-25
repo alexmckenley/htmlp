@@ -36,8 +36,7 @@
       "description": "Limits are tokens, stored as expanded integers (`1.5k` becomes 1500).",
       "type": "object",
       "properties": {
-        "max_item_tokens": {
-          "description": "Applies to each direct child section; does not change grandchildren.",
+        "max_tokens": {
           "type": [
             "integer",
             "null"
@@ -45,7 +44,8 @@
           "format": "uint64",
           "minimum": 0
         },
-        "max_tokens": {
+        "per_item": {
+          "description": "Applies to each direct child section; does not change grandchildren.",
           "type": [
             "integer",
             "null"
@@ -119,7 +119,7 @@
           ]
         },
         {
-          "description": "An empty string slot with a token bound and its required reason.",
+          "description": "A named string slot: `{{question}}`. Variables have no limits.\n\n```compile_fail\nuse htmlp::{Variable, Position};\nlet slot = Variable { id: \"question\".into(), max_tokens: 100, position: Position::default() };\n```",
           "type": "object",
           "properties": {
             "id": {
@@ -129,24 +129,14 @@
               "type": "string",
               "const": "variable"
             },
-            "max_tokens": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0
-            },
             "position": {
               "$ref": "#/$defs/Position"
-            },
-            "reason": {
-              "type": "string"
             }
           },
           "additionalProperties": false,
           "required": [
             "kind",
             "id",
-            "max_tokens",
-            "reason",
             "position"
           ]
         }
