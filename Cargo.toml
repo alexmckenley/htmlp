@@ -19,7 +19,7 @@ cli = ["json", "tokens"]
 schema = ["json", "dep:schemars"]
 
 [dependencies]
-sha2 = { version = "0.10.9", default-features = false }
+sha2 = { version = "0.11.0", default-features = false }
 xmlparser = { version = "0.13.6", default-features = false }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
