@@ -229,5 +229,5 @@
   },
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "HTMLP PromptDocument 0.1",
-  "$id": "https://alexmckenley.github.io/htmlp/schema/document.schema.json"
+  "$id": "https://extraloyal.com/htmlp/schema/document.schema.json"
 }

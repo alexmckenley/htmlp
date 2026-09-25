@@ -10,7 +10,7 @@ Gather feedback on explicit end tags, whitespace counting, section naming, and t
 
 ## Add adoption tools in this order
 
-1. Editor diagnostics and HTMLP file association using the existing parser/linter.
+1. A dedicated editor extension with unsaved-buffer diagnostics and completion; the alpha already includes a VS Code watch task, Problems panel integration, and HTML file association.
 2. Real agent harness adapters that load rules explicitly and preserve provenance.
 3. Tokenizer plugins with named model/tokenizer versions and measured limits.
 4. Native SDKs driven by the JSON schema and shared conformance fixtures.

@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "HTMLP: watch current file",
+    "type": "process",
+    "command": "node",
+    "args": ["${workspaceFolder}/dist/cli.js", "watch", "${file}", "--root", "${workspaceFolder}"],
+    "isBackground": true,
+    "problemMatcher": {
+      "owner": "htmlp",
+      "fileLocation": "absolute",
+      "pattern": {
+        "regexp": "^(.*):(\\d+):(\\d+): (error) ([^:]+): (.*)$",
+        "file": 1, "line": 2, "column": 3, "severity": 4, "code": 5, "message": 6
+      },
+      "background": { "activeOnStart": true, "beginsPattern": "^HTMLP checking$", "endsPattern": "^HTMLP ready$" }
+    }
+  }]
+}

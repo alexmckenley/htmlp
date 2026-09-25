@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/alexmckenley/htmlp.git"
   },
-  "homepage": "https://alexmckenley.github.io/htmlp/",
+  "homepage": "https://extraloyal.com/htmlp/",
   "bugs": "https://github.com/alexmckenley/htmlp/issues",
   "engines": {
     "node": ">=22"

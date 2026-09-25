@@ -87,6 +87,7 @@ Source positions use one-based lines/columns and zero-based UTF-16 offsets. They
 
 - `htmlp parse FILE`: emit the AST as JSON; syntax validation only.
 - `htmlp lint FILE [--root DIR] [--json]`: discover policy and report semantic diagnostics.
+- `htmlp watch FILE [--root DIR]`: continuously lint saved file and ancestor policy changes; emits editor-compatible diagnostics.
 - `htmlp render FILE [--root DIR] [--vars JSON_FILE]`: emit checked messages as JSON.
 - `htmlp context TARGET --root DIR [--json]`: load inherited rules, policy, and diagnostics.
 - `htmlp context TARGET --root DIR --render [--vars JSON_FILE]`: emit checked inherited messages.

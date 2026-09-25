@@ -33,6 +33,7 @@ export default function Docs() {
     <p className="note">HTMLP is experimental. The TypeScript library and CLI are implemented. Install from source or a local package; an npm registry release has not been published.</p>
     <h2 id="start">Start with one file</h2><p>Use Node.js 22.13 or later. Clone the project, build the CLI, and try a checked example.</p><pre><code>{setup}</code></pre>
     <p>For a local <code>htmlp</code> command, run <code>npm link</code>. To install the library into another project, run <code>npm pack</code> and install the resulting archive there.</p>
+    <h3>Lint while editing</h3><p>After building, open an HTMLP file in VS Code and run <strong>Tasks: Run Task → HTMLP: watch current file</strong>. Saved content and ancestor policy changes update the Problems panel. Stop the task when switching files. Other editors can consume <code>htmlp watch FILE --root DIR</code> diagnostics.</p>
     <h2 id="language">Six elements. Explicit roles.</h2><pre><code>{code}</code></pre>
     <div className="table-wrap"><table><thead><tr><th>Element</th><th>Purpose</th><th>Attributes</th></tr></thead><tbody>
       <tr><td><code>htmlp</code></td><td>One document root</td><td><code>version</code>, file/role/section limits</td></tr>

@@ -4,7 +4,7 @@
 
 HTML-compatible prompts with enforceable context budgets. Put a limit on every section, every file, and the rules inherited along a directory path.
 
-[Documentation](https://alexmckenley.github.io/htmlp/docs/) · [Specification](docs/spec.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](https://extraloyal.com/htmlp/docs/) · [Specification](docs/spec.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
 
 **Experimental 0.1 alpha.** The TypeScript/JavaScript library and CLI work today. JSON output and generated schemas provide a portable contract for other languages. No npm registry release or native SDKs for other languages are published yet.
 
@@ -71,6 +71,10 @@ Place `.htmlp.json` and `rules.htmlp` at the repository root and any descendant 
 ```
 
 The loader walks root to target. Child policy can tighten limits, never loosen them. Each file is checked locally, then the whole inherited context is checked again. Agents must explicitly integrate the loader or CLI; creating these files does not automatically change another tool's behavior.
+
+## Lint while editing
+
+In VS Code, open an HTMLP file and run **Tasks: Run Task → HTMLP: watch current file** after building the CLI. Saved content and ancestor policy changes update the Problems panel. Stop the task when switching files. The included file association enables HTML highlighting. For other editors, use `htmlp watch FILE --root DIR` and the printed `file:line:column` diagnostics.
 
 ## Counting contract
 

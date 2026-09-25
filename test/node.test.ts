@@ -60,3 +60,24 @@ test('CLI JSON AST and status codes are usable from any language', async t => {
   const usage = spawnSync(process.execPath, ['dist/cli.js', 'context', root], { encoding: 'utf8' });
   assert.equal(usage.status, 2);
 });
+test('watch updates diagnostics for saved content and ancestor policy', { timeout: 10000 }, async t => {
+  const { spawn } = await import('node:child_process');
+  const { once } = await import('node:events');
+  const root = await fixture(t); const file = path.join(root, 'a/rules.htmlp');
+  const child = spawn(process.execPath, ['dist/cli.js', 'watch', file, '--root', root]);
+  let buffer = '';
+  child.stdout.on('data', chunk => { buffer += chunk.toString(); });
+  const waitFor = async (pattern: RegExp) => {
+    while (!pattern.test(buffer)) await once(child.stdout, 'data');
+    const result = buffer; buffer = ''; return result;
+  };
+  t.after(() => { child.kill(); });
+  await waitFor(/HTMLP ready/);
+  await writeFile(file, '<htmlp max-chars="1"><system>changed</system></htmlp>');
+  assert.match(await waitFor(/budget-exceeded[\s\S]*HTMLP ready/), /File characters/);
+  await writeFile(file, rule('fixed'));
+  await waitFor(/HTMLP ready/);
+  await writeFile(path.join(root, '.htmlp.json'), '{"maxFileChars":1}');
+  assert.match(await waitFor(/budget-exceeded[\s\S]*HTMLP ready/), /File characters/);
+  child.kill(); await once(child, 'exit');
+});

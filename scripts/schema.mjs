@@ -8,7 +8,7 @@ for (const [type, file] of [['PromptDocument', 'document'], ['Policy', 'policy']
   const schema = TJS.generateSchema(program, type, { required: true, noExtraProps: true });
   if (!schema) throw new Error(`Could not generate ${type}`);
   schema.title = `HTMLP ${type} 0.1`;
-  schema.$id = `https://alexmckenley.github.io/htmlp/schema/${file}.schema.json`;
+  schema.$id = `https://extraloyal.com/htmlp/schema/${file}.schema.json`;
   // TypeScript numbers do not express integer constraints; annotate budget and
   // position fields on the generated contract with their normative ranges.
   const walk = obj => {
