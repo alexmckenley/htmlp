@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — HTMLP</title>
+<meta name="description" content="Write, check, parse, and render HTMLP prompt files.">
+<link rel="stylesheet" href="{{BASE}}/style.css">
+</head>
+<body>
+<header><a class="wordmark" href="{{BASE}}/">HTMLP</a><nav aria-label="Main"><a href="{{BASE}}/docs/" aria-current="page">Documentation</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<main>
+<h1>Documentation</h1>
+<p>HTMLP 0.2 uses three elements: <code>htmlp</code>, <code>section</code>, and <code>var</code>. Content is literal Markdown. All declared limits require a nonblank <code>reason</code>.</p>
+<h2>Files and sections</h2>
+<pre><code>&lt;htmlp max-tokens="2k" reason="Shared context."&gt;
+&lt;section id="system" max-tokens="500" reason="Loaded on every request."&gt;
+Make one change. Run its tests.
+&lt;/section&gt;
+&lt;/htmlp&gt;</code></pre>
+<p>The root limit covers the entire rendered text. A section limit covers all its descendants. Tags, attributes, and comments do not count. Whitespace inside the root does count; indentation is preserved.</p>
+<p><code>1k</code> is 1,000 tokens; <code>1.5k</code> is 1,500. Counts use <code>cl100k_base</code> by default. Token counts depend on the tokenizer; this is not a universal model limit. The Rust API accepts a custom <code>TokenCounter</code>.</p>
+<h2>Limit each item</h2>
+<pre><code>&lt;section id="checks" max-item-tokens="100" reason="Keep each check brief."&gt;
+&lt;section id="test"&gt;Run the affected tests.&lt;/section&gt;
+&lt;section id="commit"&gt;Explain the change.&lt;/section&gt;
+&lt;/section&gt;</code></pre>
+<p>Place this section inside an <code>htmlp</code> root. <code>max-item-tokens</code> applies to each direct child section. The smaller of that cap and the child's own cap wins. One reason explains the limits declared on that element.</p>
+<h2>Variables</h2>
+<pre><code>&lt;htmlp max-tokens="1k" reason="Request context."&gt;
+Answer: &lt;var id="question" max-tokens="500" reason="Bound caller input."&gt;&lt;/var&gt;
+&lt;/htmlp&gt;</code></pre>
+<p>Static checks reserve the variable's allowance. Rendering requires a string binding for every variable, checks each value, and recounts the final text. Values are inserted literally. Reservations alone cannot guarantee a final BPE token count.</p>
+<pre><code>htmlp render request.htmlp --vars values.json</code></pre>
+<p><code>values.json</code>: <code>{"question":"What changed?"}</code></p>
+<h2>Commands</h2>
+<pre><code>htmlp check ./prompts         # each .htmlp file independently
+htmlp check rules.htmlp --json
+htmlp watch ./prompts         # editor diagnostics on changes
+htmlp parse rules.htmlp       # syntax-checked JSON AST
+htmlp compile rules.htmlp     # budget-checked JSON AST
+htmlp render rules.htmlp      # checked prompt text</code></pre>
+<p>No ancestor rules or external configuration are loaded. Scans skip symlinks and <code>.git</code>, <code>node_modules</code>, <code>target</code>, <code>dist</code>, and <code>vendor</code>. A path with no matching files fails.</p>
+<h2>Rust and other languages</h2>
+<p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Section</code>, and <code>Variable</code> values. Construct nodes in memory with <code>Document::new</code>, <code>Section::new</code>, and <code>Node::text</code>. Call <code>lint</code> before use.</p>
+<p><code>get_element_by_id</code> returns a typed reference. <code>sections()</code> returns direct child sections. <code>to_string()</code> extracts text with visible <code>{{name}}</code> placeholders; use <code>render</code> for checked substitutions. IDs such as <code>system</code> are labels, not SDK roles.</p>
+<p>Other languages can invoke the CLI and consume JSON. Native bindings and build-tool plugins are not included in this alpha.</p>
+<h2>Strict markup</h2>
+<p>Use lowercase tags, quoted attributes, explicit closing tags, and unique IDs. Escape literal <code>&lt;</code> as <code>&amp;lt;</code> and <code>&amp;</code> as <code>&amp;amp;</code>, including inside Markdown code fences. Unknown elements and attributes fail. No browser error recovery is performed.</p>
+<p>Limits and reasons are editable source. Require review or CI policy to protect changes to budgets. A reason explains a constraint; it cannot prevent an agent from changing it.</p>
+<h2>Reference</h2>
+<ul>
+<li><a href="{{BASE}}/api/htmlp/index.html">Generated Rust API</a></li>
+<li><a href="{{BASE}}/document.schema.json">Generated document JSON Schema</a></li>
+<li><a href="{{BASE}}/spec.md">Format specification</a></li>
+<li><a href="https://github.com/alexmckenley/htmlp/blob/main/CONTRIBUTING.md">Development and editor setup</a></li>
+</ul>
+</main>
+<footer>HTMLP 0.2 · Alpha · <a href="{{BASE}}/">Home</a></footer>
+</body>
+</html>

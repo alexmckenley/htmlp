@@ -1,19 +1,9 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
-    groups:
-      development:
-        dependency-type: development
-  - package-ecosystem: npm
-    directory: /site
-    schedule:
-      interval: weekly
-    groups:
-      site-dependencies:
-        patterns: ['*']
   - package-ecosystem: github-actions
     directory: /
     schedule:

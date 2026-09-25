@@ -7,19 +7,17 @@ permissions:
   contents: read
 jobs:
   test:
-    name: Test (Node ${{ matrix.node }})
+    name: Rust
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [22, 24]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: node dist/cli.js lint examples/rules.htmlp
-      - run: node dist/cli.js context examples/monorepo/packages/api --root examples/monorepo
-      - run: npm pack --dry-run
+      - run: rustup update stable --no-self-update && rustup default stable
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --check
+      - run: cargo test --locked --all-features
+      - run: cargo test --locked --no-default-features
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: cargo run --locked --features cli -- check examples
+      - run: cargo run --locked --example schema --features schema > schema/document.schema.json
+      - run: git diff --exit-code -- schema/document.schema.json
+      - run: cargo package --locked --no-verify

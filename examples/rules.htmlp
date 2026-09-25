@@ -1,7 +1,5 @@
-<htmlp version="0.1" max-chars="4000" max-section-chars="600">
-  <system>
-    <section name="working-agreement">Make the smallest useful change.
-Test the behavior you changed.</section>
-  </system>
-  <user>Review <var name="diff" max-chars="2000"></var></user>
+<htmlp max-tokens="2k" reason="Loaded on every request.">
+<section id="workflow" max-tokens="500" reason="Keep routine steps short.">
+Read the code. Make one change. Run its tests.
+</section>
 </htmlp>

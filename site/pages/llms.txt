@@ -1,0 +1,23 @@
+# HTMLP 0.2
+
+A strict markup format for prompt files with explicit token limits.
+
+Save as .htmlp:
+<htmlp max-tokens="1k" reason="Shared context.">
+<section id="workflow">Make one change. Test it.</section>
+</htmlp>
+
+Check: htmlp check ./prompts
+Every declared max-tokens or max-item-tokens requires a nonblank reason on that element.
+Each file is independent; no external configuration or directory inheritance.
+1k = 1000 tokens. Default encoding: cl100k_base, not a universal model tokenizer.
+Use section IDs for lookup. var needs id, max-tokens, reason, and an explicit closing tag.
+Escape literal < and & in Markdown. Unknown markup fails.
+render checks static reservations, bindings, and final text.
+Inline limits and reasons are editable; policy changes need review.
+
+Guide: {{BASE}}/docs/
+Specification: {{BASE}}/spec.md
+Schema: {{BASE}}/document.schema.json
+Rust API: {{BASE}}/api/htmlp/index.html
+Source: https://github.com/alexmckenley/htmlp

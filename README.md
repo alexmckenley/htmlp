@@ -1,103 +1,74 @@
 # HTMLP
 
-**Kill the prompt monolith.**
+A strict markup format for prompt files with explicit token limits.
 
-HTML-compatible prompts with enforceable context budgets. Put a limit on every section, every file, and the rules inherited along a directory path.
-
-[Documentation](https://extraloyal.com/htmlp/docs/) · [Specification](docs/spec.md) · [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md)
-
-**Experimental 0.1 alpha.** The TypeScript/JavaScript library and CLI work today. JSON output and generated schemas provide a portable contract for other languages. No npm registry release or native SDKs for other languages are published yet.
+Keep shared instructions within a defined budget. Put a limit and its reason beside the content; check every file before it reaches an agent.
 
 ```html
-<htmlp max-chars="4000" max-section-chars="600">
-  <system>
-    <section name="working-agreement">Make the smallest useful change.
-Test the behavior you changed.</section>
-  </system>
-  <user>Review <var name="diff" max-chars="2000"></var></user>
+<htmlp max-tokens="2k" reason="Loaded on every request.">
+<section id="workflow" max-tokens="500" reason="Keep routine steps short.">
+Read the code. Make one change. Run its tests.
+</section>
 </htmlp>
 ```
 
-Prompts tend to grow one pasted instruction at a time. HTMLP turns that growth into a reviewable contract: named sections, explicit roles, bounded variables, and lint errors when content outgrows its budget.
+Save as `rules.htmlp`. `2k` means 2,000 tokens. Every declared limit requires a nonblank `reason`.
 
-## Try it
+## Install and check
 
-Requires Node.js 22.13 or newer for the full project.
+Requires a Rust toolchain. This alpha is distributed through GitHub; it is not published to crates.io.
 
 ```sh
-git clone https://github.com/alexmckenley/htmlp.git
-cd htmlp
-npm ci
-npm run build
-node dist/cli.js lint examples/rules.htmlp
-node dist/cli.js render examples/rules.htmlp --vars examples/variables.json
-node dist/cli.js context examples/monorepo/packages/api --root examples/monorepo --json
+cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.1 --features cli
+htmlp check ./prompts
 ```
 
-Use `npm link` for a local `htmlp` command, or `npm pack` to produce an installable package. The package name `@htmlp/core` describes the intended API; do not assume it is available from npm.
+Or clone the repository and run `cargo install --path . --features cli`.
 
-## Use the types without the language
+The CLI recursively checks `.htmlp` files independently. No repository configuration, ancestor discovery, or implicit prompt loading. `htmlp watch ./prompts` reports changes for editor integration.
 
-```ts
-import { document, system, section, text, variable, lint, render } from '@htmlp/core';
+```sh
+htmlp check rules.htmlp --json   # measurements and diagnostics
+htmlp parse rules.htmlp         # syntax-checked JSON AST
+htmlp compile rules.htmlp       # also enforce budgets
+htmlp render request.htmlp --vars values.json
+```
 
-const prompt = document([
-  system([section('task', [text('Review '), variable('diff', 2000)], 2200)]),
+## Format
+
+- `<htmlp>` is the single root; `max-tokens` and `reason` are required.
+- `<section>` groups Markdown. Optional `id` supports lookup. Optional `max-tokens` bounds its full text, including descendants.
+- `max-item-tokens` on a root or section caps each direct child section. A child's own smaller limit still applies.
+- `<var id="question" max-tokens="500" reason="Bound caller input."></var>` reserves a named string slot.
+- One `reason` explains the limits declared on that element. Reasons are metadata, excluded from rendered text.
+
+All tags are lowercase with explicit closing tags and quoted attributes. Escape literal `<` and `&`, even in Markdown fences. Whitespace is preserved. Unknown syntax fails instead of being repaired like browser HTML.
+
+Budgets count rendered text with `cl100k_base`, not characters or guessed tokens. The encoding can differ from your model's tokenizer. Variable allowances are checked statically; `render` also checks bound values and final text because token counts are not additive across interpolation boundaries. Limits do not include SDK role wrappers or other provider overhead.
+
+## Rust API
+
+The default library has one dependency: the allocation-free `xmlparser` tokenizer. HTMLP itself allocates its owned AST. JSON, schema generation, and embedded tokenization are optional features. The CLI includes exact tokenization and consequently vocabulary data.
+
+```rust
+use htmlp::{Document, Node, Section};
+
+let document = Document::new(1000, "Shared context.", vec![
+    Node::Section(Section::new("system", vec![Node::text("Review the change.")])),
 ]);
-
-const policy = { maxSectionChars: 2200 };
-const report = lint(prompt, policy);
-const messages = render(prompt, { diff: '+ const answer = 42;' }, policy);
-// Pass messages to your SDK's compatible message interface.
+assert_eq!(document.get_element_by_id("system").unwrap().to_string(), "Review the change.");
 ```
 
-`parse(source)` returns a typed AST and diagnostics. `parseFile(path)` from `@htmlp/core/node` reads UTF-8 from disk. `loadContext(root, target)` loads inherited rules; `renderContext(context, variables)` produces checked messages. The API reference and JSON Schemas are generated from the public interfaces and enums.
+Use `parse`, `parse_file`, `lint`, and `render`. Supply a `TokenCounter`, or enable `tokens` and use `Cl100k`. `sections()` returns direct child sections. `to_string()` is an unchecked text view with `{{name}}` placeholders; `render` returns checked substitutions. Section IDs do not assign SDK message roles.
 
-## Monorepo policy
+Other languages can use the CLI's JSON output and generated schema. Native bindings and source-code literal analysis are future work.
 
-Place `.htmlp.json` and `rules.htmlp` at the repository root and any descendant directories:
+## Documentation
 
-```json
-{
-  "maxFileChars": 4000,
-  "maxSectionChars": 600,
-  "maxSystemChars": 6000,
-  "maxContextChars": 8000,
-  "maxSections": 8,
-  "allowedRoles": ["system"],
-  "requiredSections": ["testing"],
-  "allowFreeText": false
-}
-```
+[Website and guide](https://extraloyal.com/htmlp/) · [Specification](docs/spec.md) · [Generated Rust API](https://extraloyal.com/htmlp/api/htmlp/index.html) · [JSON Schema](schema/document.schema.json)
 
-The loader walks root to target. Child policy can tighten limits, never loosen them. Each file is checked locally, then the whole inherited context is checked again. Agents must explicitly integrate the loader or CLI; creating these files does not automatically change another tool's behavior.
+[Contributing](CONTRIBUTING.md) · [Design decisions](docs/decisions.md) · [Roadmap](docs/roadmap.md) · [Security](SECURITY.md)
 
-## Lint while editing
+This is a breaking 0.2 alpha. The former TypeScript/character-budget implementation remains at [v0.1.0-alpha.1](https://github.com/alexmckenley/htmlp/tree/v0.1.0-alpha.1). Inline constraints are editable: protect budget changes through review or CI policy. A required reason explains a limit; it does not make that limit immutable.
 
-In VS Code, open an HTMLP file and run **Tasks: Run Task → HTMLP: watch current file** after building the CLI. Saved content and ancestor policy changes update the Problems panel. Stop the task when switching files. The included file association enables HTML highlighting. For other editors, use `htmlp watch FILE --root DIR` and the printed `file:line:column` diagnostics.
-
-## Counting contract
-
-Budgets count Unicode code points in expanded content, **not tokens**. Whitespace inside messages counts; markup and comments do not. Each variable reserves its declared maximum. File and context accounting includes two characters between messages. Runtime substitution is literal, bounded, and never evaluated. See the [specification](docs/spec.md) for exact semantics and defaults.
-
-HTMLP uses HTML fragment parsing with application-defined elements, explicit closing tags, and strict structure. It is HTML-parseable, not a promise of standard HTML vocabulary or arbitrary HTML support.
-
-## Develop
-
-```sh
-npm ci
-npm run check
-npm --prefix site ci
-npm run docs:build
-npm --prefix site run dev
-```
-
-The project includes tests, generated-schema drift checks, continuous integration, GitHub Pages publishing, issue/PR templates, contribution guidance, a security policy, and MIT licensing. API docs are generated with TypeDoc. The site source is in `site/`.
-
-## Prior art
-
-[Microsoft POML](https://github.com/microsoft/POML) already explores prompt markup and templating. HTMLP focuses on budget enforcement and directory policy. [remark](https://github.com/remarkjs/remark) is the parse/typed-tree/tooling reference. Read the [design decisions](docs/decisions.md) for rationale and documentation references.
-
-## License
-
-[MIT](LICENSE). Contributions are welcome; the format is still open to change.
+MIT licensed. See [LICENSE](LICENSE).

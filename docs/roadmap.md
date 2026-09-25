@@ -1,19 +1,14 @@
-# What to do next
+# Roadmap
 
-## First: validate on actual prompt sprawl
+The 0.2 alpha implements self-contained prompt files, required reasons, exact token budgets, typed Rust nodes, ID lookup, bounded string variables, a directory checker, editor watch mode, JSON output, and generated API/schema documentation.
 
-Convert one real rules tree, preserving the exact intended prompt text. Measure the largest sections, each file, and the composed context for representative directories. Choose budgets from that inventory, then enforce them in CI. Record where named sections improve review and where the syntax gets in the way.
+Next, validate the format on real prompt files before expanding it. Gather evidence about the need for additional tokenizers and measure parser throughput, binary size, and large-repository watch cost.
 
-## Stabilize the contract
+Possible later work, not current features:
 
-Gather feedback on explicit end tags, whitespace counting, section naming, and the split between file-local and repository policy. Expand cross-language conformance fixtures. Lock the 0.1 specification before promising compatibility.
+- C ABI, WebAssembly, or native language bindings.
+- Build-tool integrations and static extraction of prompt literals.
+- A language server for inline editor diagnostics.
+- Explicit composition with aggregate budgets.
 
-## Add adoption tools in this order
-
-1. A dedicated editor extension with unsaved-buffer diagnostics and completion; the alpha already includes a VS Code watch task, Problems panel integration, and HTML file association.
-2. Real agent harness adapters that load rules explicitly and preserve provenance.
-3. Tokenizer plugins with named model/tokenizer versions and measured limits.
-4. Native SDKs driven by the JSON schema and shared conformance fixtures.
-5. A TypeScript build plugin that extracts supported literal constructors into compiled artifacts; reject dynamic expressions rather than pretending to analyze them.
-
-No schedule or support commitment is implied. Propose changes through issues and small pull requests. Avoid adding a general template programming language until concrete adoption requires it.
+Keep versioning deliberate. Do not add arbitrary HTML, executable interpolation, implicit SDK roles, or repository configuration without a concrete use case.
