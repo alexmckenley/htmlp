@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTMLP — Token limits for prompt files</title>
+<meta name="description" content="HTMLP is a strict markup format for prompt files with explicit token limits.">
+<link rel="stylesheet" href="{{BASE}}/style.css">
+</head>
+<body>
+<header><a class="wordmark" href="{{BASE}}/">HTMLP</a><nav aria-label="Main"><a href="{{BASE}}/docs/">Documentation</a><a href="https://github.com/alexmckenley/htmlp">Source</a></nav></header>
+<main>
+<h1>HTMLP</h1>
+<p class="lead">A strict markup format for prompt files with explicit token limits.</p>
+<p>Keep shared instructions within a defined budget. Put a limit and its reason beside the content; check every file before it reaches an agent.</p>
+<h2>Write a prompt file</h2>
+<p>Use the <code>.htmlp</code> extension. Set <code>max-tokens</code> and a brief <code>reason</code>. Write Markdown inside sections.</p>
+<pre><code>&lt;htmlp max-tokens="2k" reason="Loaded on every request."&gt;
+&lt;section id="workflow" max-tokens="500" reason="Keep routine steps short."&gt;
+Read the code. Make one change. Run its tests.
+&lt;/section&gt;
+&lt;/htmlp&gt;</code></pre>
+<h2>Check it</h2>
+<pre><code>cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.1 --features cli
+htmlp check ./prompts</code></pre>
+<p><code>2k</code> means 2,000 tokens. The checker reports invalid markup, missing reasons, and exceeded limits. Each file is independent; no repository configuration is needed.</p>
+<p><a href="{{BASE}}/docs/">Read the documentation →</a></p>
+</main>
+<footer>HTMLP 0.2 · Alpha · <a href="https://github.com/alexmckenley/htmlp/blob/main/LICENSE">MIT license</a></footer>
+</body>
+</html>

@@ -1,0 +1,24 @@
+:root { color-scheme: light; font-family: Georgia, "Times New Roman", serif; color: #202830; background: #fff; font-size: 18px; line-height: 1.65; }
+* { box-sizing: border-box; }
+body { max-width: 48rem; margin: 0 auto; padding: 0 1.25rem; }
+header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem 2rem; padding: 1.5rem 0; border-bottom: 1px solid #ccd2d8; }
+a { color: #174a77; text-underline-offset: .17em; }
+a:hover { color: #081c30; }
+a:focus-visible { outline: 2px solid #174a77; outline-offset: 4px; }
+.wordmark { color: inherit; font: bold 1rem ui-monospace, monospace; letter-spacing: .06em; text-decoration: none; }
+nav { display: flex; gap: 1.5rem; font: .85rem/1.6 system-ui, sans-serif; }
+main { padding: 2rem 0; }
+h1, h2, h3 { line-height: 1.25; color: #17212b; }
+h1 { font-size: 2.65rem; margin: 0 0 .6rem; letter-spacing: -.035em; }
+h2 { font-size: 1.3rem; margin: 2rem 0 .7rem; }
+h3 { font-size: 1.05rem; margin: 1.6rem 0 .6rem; }
+p { margin: .8rem 0; }
+.lead { font-size: 1.25rem; line-height: 1.5; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .83em; }
+pre { overflow-x: auto; padding: 1rem; background: #f5f7f9; border: 1px solid #dbe0e5; line-height: 1.6; tab-size: 2; }
+pre code { font-size: .8rem; }
+footer { border-top: 1px solid #ccd2d8; padding: 1rem 0 2rem; color: #53606d; font: .8rem/1.6 system-ui, sans-serif; }
+ul { padding-left: 1.4rem; }
+dt { font-weight: bold; margin-top: 1rem; }
+dd { margin: .2rem 0 0; }
+@media (max-width: 32rem) { :root { font-size: 16px; } main { padding-top: 1.5rem; } h1 { font-size: 2.3rem; } }

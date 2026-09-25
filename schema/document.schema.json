@@ -1,233 +1,182 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Document",
+  "description": "Portable AST. Use [`crate::parse`] or [`Document::new`] to create a document.",
   "type": "object",
   "properties": {
-    "kind": {
-      "type": "string",
-      "const": "document"
-    },
-    "version": {
-      "type": "string",
-      "const": "0.1"
-    },
-    "limits": {
-      "$ref": "#/definitions/DocumentLimits"
-    },
     "children": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/MessageNode"
+        "$ref": "#/$defs/Node"
       }
     },
+    "limits": {
+      "$ref": "#/$defs/Limits"
+    },
     "position": {
-      "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
-      "$ref": "#/definitions/Position"
+      "$ref": "#/$defs/Position"
+    },
+    "tokenizer": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
     }
   },
   "additionalProperties": false,
   "required": [
-    "children",
-    "kind",
+    "version",
+    "tokenizer",
     "limits",
-    "version"
+    "children",
+    "position"
   ],
-  "definitions": {
-    "DocumentLimits": {
-      "description": "Document-local limits may only tighten the external policy.",
+  "$defs": {
+    "Limits": {
+      "description": "Limits are tokens, stored as expanded integers (`1.5k` becomes 1500).",
       "type": "object",
       "properties": {
-        "maxChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+        "max_item_tokens": {
+          "description": "Applies to each direct child section; does not change grandchildren.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
         },
-        "maxSectionChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+        "max_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
         },
-        "maxSystemChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "maxUserChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "maxSections": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+        "reason": {
+          "description": "Required, nonblank rationale whenever either limit is declared.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
     },
-    "MessageNode": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "message"
-        },
-        "role": {
-          "$ref": "#/definitions/Role"
-        },
-        "maxChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "children": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ContentNode"
-          }
-        },
-        "position": {
-          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
-          "$ref": "#/definitions/Position"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "children",
-        "kind",
-        "role"
-      ]
-    },
-    "Role": {
-      "description": "Roles supported by version 0.1. Provider adaptation belongs to the caller.",
-      "type": "string",
-      "enum": [
-        "system",
-        "user"
-      ]
-    },
-    "ContentNode": {
-      "anyOf": [
+    "Node": {
+      "description": "Markdown stays literal text. These are the only content node kinds.",
+      "oneOf": [
         {
-          "$ref": "#/definitions/TextNode"
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "text"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ]
         },
         {
-          "$ref": "#/definitions/VariableNode"
+          "description": "A semantic grouping. IDs have no provider-specific role or trust meaning.",
+          "type": "object",
+          "properties": {
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Node"
+              }
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "section"
+            },
+            "limits": {
+              "$ref": "#/$defs/Limits"
+            },
+            "position": {
+              "$ref": "#/$defs/Position"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "limits",
+            "children",
+            "position"
+          ]
         },
         {
-          "$ref": "#/definitions/SectionNode"
+          "description": "An empty string slot with a token bound and its required reason.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "variable"
+            },
+            "max_tokens": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "position": {
+              "$ref": "#/$defs/Position"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "max_tokens",
+            "reason",
+            "position"
+          ]
         }
-      ]
-    },
-    "TextNode": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "text"
-        },
-        "value": {
-          "type": "string"
-        },
-        "position": {
-          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
-          "$ref": "#/definitions/Position"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "value"
       ]
     },
     "Position": {
-      "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
+      "description": "One-based Unicode-scalar line/column; zero-based UTF-8 byte offset.\nZero line/column denotes an unknown location or an in-memory node.",
       "type": "object",
       "properties": {
-        "line": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
         "column": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 9007199254740991
+          "format": "uint",
+          "minimum": 0
+        },
+        "line": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
         },
         "offset": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+          "format": "uint",
+          "minimum": 0
         }
       },
-      "additionalProperties": false,
       "required": [
-        "column",
         "line",
+        "column",
         "offset"
       ]
-    },
-    "VariableNode": {
-      "description": "A bounded string substitution; values are never evaluated or parsed as markup.",
-      "type": "object",
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "variable"
-        },
-        "name": {
-          "type": "string"
-        },
-        "maxChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "position": {
-          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
-          "$ref": "#/definitions/Position"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "maxChars",
-        "name"
-      ]
-    },
-    "SectionNode": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "type": "string",
-          "const": "section"
-        },
-        "name": {
-          "type": "string"
-        },
-        "maxChars": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "children": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ContentNode"
-          }
-        },
-        "position": {
-          "description": "One-based line/column; zero-based UTF-16 offset, matching JavaScript and parse5.",
-          "$ref": "#/definitions/Position"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "children",
-        "kind",
-        "name"
-      ]
     }
-  },
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HTMLP PromptDocument 0.1",
-  "$id": "https://extraloyal.com/htmlp/schema/document.schema.json"
+  }
 }

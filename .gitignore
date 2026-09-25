@@ -10,3 +10,7 @@ site/public/spec.md
 site/.vite/
 site/.wrangler/
 .DS_Store
+target/
+site/dist/
+site/reference/
+artifacts/

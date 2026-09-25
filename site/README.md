@@ -1,14 +1,5 @@
 # HTMLP website
 
-Homepage and language guide, built with the Sites Vinext starter and exported as static HTML. The parent repository generates TypeDoc reference pages, schemas, and the standalone specification into `public/` before building.
+Plain HTML and CSS. Build from the repository with `python3 site/build.py`; it generates the Rust reference and copies the schema/specification. Serve `site/dist` with any static server. For GitHub Pages, set `HTMLP_BASE_PATH=/htmlp`.
 
-From the repository root:
-
-```sh
-npm ci
-npm --prefix site ci
-npm run docs:build
-npm --prefix site run dev
-```
-
-`HTMLP_BASE_PATH=/htmlp npm run docs:build` builds for GitHub Pages. Omitting that variable builds for a root-domain host. GitHub Actions publishes the public site from `main`. Sites deployment uses `.openai/hosting.json` and the static output at `dist/client`.
+The separate Sites source checkout includes `reference/` as a generated snapshot so it can build independently. Its `.openai/hosting.json` selects `dist` as the static output.

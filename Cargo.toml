@@ -1,0 +1,42 @@
+[package]
+name = "htmlp"
+version = "0.2.0-alpha.1"
+edition = "2024"
+rust-version = "1.85"
+description = "Strict markup for prompt files with explicit token limits."
+license = "MIT"
+repository = "https://github.com/alexmckenley/htmlp"
+homepage = "https://extraloyal.com/htmlp/"
+keywords = ["prompt", "parser", "lint", "tokens", "agents"]
+categories = ["parser-implementations", "command-line-utilities"]
+include = ["src/**", "examples/*.rs", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE", "schema/**", "docs/**"]
+
+[features]
+default = []
+json = ["dep:serde", "dep:serde_json"]
+tokens = ["dep:tiktoken-rs"]
+cli = ["json", "tokens"]
+schema = ["json", "dep:schemars"]
+
+[dependencies]
+xmlparser = { version = "0.13.6", default-features = false }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+tiktoken-rs = { version = "0.12.1", optional = true }
+schemars = { version = "1.2", optional = true }
+
+[[bin]]
+name = "htmlp"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[example]]
+name = "schema"
+required-features = ["schema"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
