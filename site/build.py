@@ -12,8 +12,11 @@ if (root / 'Cargo.toml').exists():
     subprocess.run(['cargo', 'doc', '--locked', '--all-features', '--no-deps'], cwd=root, check=True)
     reference.mkdir(exist_ok=True)
     shutil.copytree(root / 'target/doc', reference / 'api', dirs_exist_ok=True)
-    shutil.copyfile(root / 'schema/document.schema.json', reference / 'document.schema.json')
-    shutil.copyfile(root / 'docs/spec.md', reference / 'spec.md')
+    for schema in (root / 'schema').glob('*.schema.json'):
+        shutil.copyfile(schema, reference / schema.name)
+    for name in ['spec.md', 'runtime.md']:
+        text = (root / 'docs' / name).read_text().replace('../schema/', './')
+        (reference / name).write_text(text)
 if not (reference / 'api/htmlp/index.html').is_file():
     raise SystemExit('Build from the HTMLP repository or supply the generated reference directory.')
 out = site / 'dist'

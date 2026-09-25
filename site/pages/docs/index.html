@@ -51,6 +51,10 @@ htmlp render rules.htmlp      # checked prompt text</code></pre>
 <p>Use <code>parse</code> or <code>parse_file</code> for typed <code>Document</code>, <code>Section</code>, and <code>Variable</code> values. Construct nodes in memory with <code>Document::new</code>, <code>Section::new</code>, and <code>Node::text</code>. Call <code>Document::sign()</code> to accept in-memory budgets, then <code>lint</code> before use. <code>sign_source</code> preserves file formatting.</p>
 <p><code>get_element_by_id</code> returns a typed reference. <code>sections()</code> returns direct child sections. <code>to_string()</code> extracts text with visible <code>{{name}}</code> placeholders; use <code>render</code> for checked substitutions. IDs such as <code>system</code> are labels, not SDK roles.</p>
 <p>Other languages can invoke the CLI and consume JSON. Native bindings and build-tool plugins are not included in this alpha.</p>
+<h2>Runtime prompts</h2>
+<p>Enable the Rust <code>runtime</code> feature for attributed <code>PromptFragment</code>s, typed text/image/tool content, and <code>ModelRequest</code>s. Every fragment requires a source category and role. <code>request.estimate()</code> provides categorized byte-based estimates with an explicit image reserve; <code>TokenUsage</code> keeps provider-reported usage separate. Missing attribution is <code>None</code>, not zero.</p>
+<p><code>render_checked</code> returns immutable text, its tokenizer measurement, and non-overlapping spans with section ancestry. <code>section(id)</code> selects from a fully checked document; <code>PromptFragment::checked</code> bridges it into a request. Category attributes are not yet supported in markup.</p>
+<p><a href="{{BASE}}/runtime.md">Runtime API guide</a></p>
 <h2>Strict markup</h2>
 <p>Use lowercase tags, quoted attributes, and unique section IDs. Empty elements can self-close: <code>&lt;section id="notes" /&gt;</code>. Otherwise use matching closing tags. Escape literal <code>&lt;</code> as <code>&amp;lt;</code> and <code>&amp;</code> as <code>&amp;amp;</code>, including inside Markdown code fences. Unknown elements and attributes fail. No browser error recovery is performed. Self-closing non-void elements follow XML rules, so ordinary HTML parsing is not equivalent.</p>
 <p>Limits and reasons are editable source. Require review or CI policy to protect changes to budgets. A reason explains a constraint; it cannot prevent an agent from changing it.</p>
@@ -58,6 +62,8 @@ htmlp render rules.htmlp      # checked prompt text</code></pre>
 <ul>
 <li><a href="{{BASE}}/api/htmlp/index.html">Generated Rust API</a></li>
 <li><a href="{{BASE}}/document.schema.json">Generated document JSON Schema</a></li>
+<li><a href="{{BASE}}/request.schema.json">Generated request JSON Schema</a></li>
+<li><a href="{{BASE}}/usage.schema.json">Generated usage JSON Schema</a></li>
 <li><a href="{{BASE}}/spec.md">Format specification</a></li>
 <li><a href="https://github.com/alexmckenley/htmlp/blob/main/CONTRIBUTING.md">Development and editor setup</a></li>
 </ul>

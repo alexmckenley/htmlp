@@ -19,7 +19,7 @@ Save as `rules.htmlp`. `2k` means 2,000 tokens. Every declared limit requires a 
 Requires a Rust toolchain. This alpha is distributed through GitHub; it is not published to crates.io.
 
 ```sh
-cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.3 --features cli
+cargo install --git https://github.com/alexmckenley/htmlp --tag v0.2.0-alpha.4 --features cli
 htmlp sign ./prompts
 htmlp check ./prompts
 ```
@@ -76,6 +76,12 @@ assert_eq!(document.get_element_by_id("system").unwrap().to_string(), "Review th
 Use `parse`, `parse_file`, `lint`, and `render`. Supply a `TokenCounter`, or enable `tokens` and use `Cl100k`. `sections()` returns direct child sections. `to_string()` is an unchecked text view with `{{name}}` placeholders; `render` returns checked substitutions. Section IDs do not assign SDK message roles.
 
 Other languages can use the CLI's JSON output and generated schema. Native bindings and source-code literal analysis are future work.
+
+## Runtime prompts
+
+Enable `runtime` for attributed model requests, typed text/image/tool content, and categorized usage accounting. Every `PromptFragment` requires a source and role. `ModelRequest::estimate()` returns an explicit heuristic; `TokenUsage` keeps it separate from provider-reported usage and represents unavailable attribution as `None`.
+
+`render_checked` returns immutable text, tokenizer measurements, and section provenance. Pass it to `PromptFragment::checked` to bridge files into attributed requests. [Runtime API guide](docs/runtime.md).
 
 ## Documentation
 

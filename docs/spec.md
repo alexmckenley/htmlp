@@ -83,6 +83,12 @@ The optional `json` feature serializes node variants with a lowercase `kind` dis
 
 The `schema` feature generates the document schema from these Rust types. `cargo doc` generates their API reference. Diagnostic codes and JSON fields are experimental in this alpha.
 
+## Runtime API
+
+The optional `runtime` feature provides mandatory source attribution, typed model requests, heuristic request estimates, and provider-reported usage. It does not add markup elements or attributes. See the [runtime guide](runtime.md).
+
+`render_checked` returns immutable text, its tokenizer measurement, a full budget report, and non-overlapping spans with section ancestry. Named sections can be selected only after validating the whole document. Budget measurements overlap; category accounting must not sum parent and child measurements.
+
 ## CLI
 
 `sign PATH` updates budget signatures. `check PATH [--json]` walks files deterministically and checks each `.htmlp` file. `parse FILE` validates syntax and returns an AST; `compile FILE` also checks fully static budgets; variable-dependent budgets still require rendering. `render FILE [--vars FILE]` returns checked plaintext, without adding a newline. Bindings are a JSON object of string values. `watch PATH` polls content every 500 ms and emits editor diagnostics on changes.

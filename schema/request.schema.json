@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModelRequest",
+  "description": "A complete, attributed model request. Constructed only via [`ModelRequestBuilder`].",
+  "type": "object",
+  "properties": {
+    "fragments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PromptFragment"
+      }
+    },
+    "max_output_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "model": {
+      "type": "string"
+    },
+    "thinking_level": {
+      "$ref": "#/$defs/ThinkingLevel"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ToolDefinition"
+      }
+    }
+  },
+  "required": [
+    "fragments",
+    "tools",
+    "model",
+    "thinking_level"
+  ],
+  "$defs": {
+    "ContentBlock": {
+      "description": "Provider-neutral content block.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "description": "Provider reasoning returned alongside an assistant message. Adapters\nthat support preserved thinking replay this through their native\nfield; other adapters deliberately omit it.",
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "reasoning"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "base64_data": {
+              "type": "string"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "base64_data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "arguments": true,
+            "tool_name": {
+              "type": "string"
+            },
+            "tool_use_id": {
+              "$ref": "#/$defs/ToolUseId"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_use"
+            }
+          },
+          "required": [
+            "type",
+            "tool_use_id",
+            "tool_name",
+            "arguments"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "is_error": {
+              "type": "boolean"
+            },
+            "tool_use_id": {
+              "$ref": "#/$defs/ToolUseId"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_result"
+            }
+          },
+          "required": [
+            "type",
+            "tool_use_id",
+            "content",
+            "is_error"
+          ]
+        }
+      ]
+    },
+    "ContentSource": {
+      "description": "The origin category of a piece of model-bound content.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "system_prompt"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "description": "A typed context block (env details, rules, skills catalog, ...).",
+          "type": "object",
+          "properties": {
+            "block_id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "context_block"
+            }
+          },
+          "required": [
+            "kind",
+            "block_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "tool_definitions"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "user_message"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "session_message"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "description": "Prior assistant output replayed as history.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "assistant_history"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "tool_output"
+            },
+            "tool_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "tool_name"
+          ]
+        },
+        {
+          "description": "Harness-injected content, distinct from user-authored messages.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "system_reminder"
+            },
+            "origin": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "origin"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hook_name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "hook"
+            }
+          },
+          "required": [
+            "kind",
+            "hook_name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "compaction_summary"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "PromptFragment": {
+      "description": "A source-attributed piece of a model request. Fields are private; the only\nconstructors require attribution at the call site.\n\n```compile_fail\nuse htmlp::runtime::{PromptFragment, Role};\nlet fragment = PromptFragment::text(Role::User, \"untagged\");\n```",
+      "type": "object",
+      "properties": {
+        "byte_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentBlock"
+          }
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "source": {
+          "$ref": "#/$defs/ContentSource"
+        }
+      },
+      "required": [
+        "source",
+        "role",
+        "content",
+        "byte_count"
+      ]
+    },
+    "Role": {
+      "description": "Message role; source attribution remains independent of role.",
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant",
+        "system"
+      ]
+    },
+    "ThinkingLevel": {
+      "description": "Reasoning/thinking effort. Providers map this to their native knob\n(Anthropic `budget_tokens`, OpenAI `reasoning_effort`).",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "off",
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "description": "Serialized as \"xhigh\". Providers clamp to the model's max effort.",
+          "type": "string",
+          "const": "xhigh"
+        },
+        {
+          "description": "Provider-native maximum reasoning effort when distinct from xhigh.",
+          "type": "string",
+          "const": "max"
+        }
+      ]
+    },
+    "ToolDefinition": {
+      "description": "A tool definition offered to the model. Counted under\n[`ContentSource::ToolDefinitions`] in attribution.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "input_schema": true,
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "input_schema"
+      ]
+    },
+    "ToolUseId": {
+      "description": "Opaque provider-neutral tool-call identity. The caller generates IDs;\nHTMLP has no UUID, clock, or random-number dependency.",
+      "type": "string"
+    }
+  }
+}

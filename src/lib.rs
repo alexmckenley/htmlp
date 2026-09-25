@@ -11,6 +11,10 @@ mod check;
 mod files;
 mod model;
 mod parser;
+mod rendered;
+pub use rendered::{RenderedPrompt, RenderedSpan, SectionOrigin, TextMeasurement, render_checked};
+#[cfg(feature = "runtime")]
+pub mod runtime;
 mod signing;
 pub use check::{TokenCounter, lint, render};
 pub use files::{FileReport, check_path, parse_file, sign_path};

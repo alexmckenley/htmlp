@@ -240,6 +240,13 @@ pub fn render(
     bindings: &Bindings,
     counter: &impl TokenCounter,
 ) -> Result<String, Vec<Diagnostic>> {
+    render_with_report(doc, bindings, counter).map(|(text, _)| text)
+}
+pub(crate) fn render_with_report(
+    doc: &Document,
+    bindings: &Bindings,
+    counter: &impl TokenCounter,
+) -> Result<(String, Report), Vec<Diagnostic>> {
     let checked = lint(doc, counter);
     if !checked.is_ok() {
         return Err(checked.diagnostics);
@@ -253,7 +260,7 @@ pub fn render(
     if !analyzer.report.is_ok() {
         return Err(analyzer.report.diagnostics);
     }
-    Ok(pieces
+    let text = pieces
         .into_iter()
         .filter_map(|p| {
             if let Piece::Text(s) = p {
@@ -262,5 +269,6 @@ pub fn render(
                 None
             }
         })
-        .collect())
+        .collect();
+    Ok((text, analyzer.report))
 }

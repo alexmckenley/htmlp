@@ -2,6 +2,8 @@
 
 The 0.2 alpha implements self-contained prompt files, required reasons, exact token budgets, typed Rust nodes, ID lookup, named string variables, a directory checker, editor watch mode, JSON output, and generated API/schema documentation.
 
+The optional runtime API also provides attributed requests, categorized estimates, reported usage, and checked rendering with section provenance.
+
 Next, validate the format on real prompt files before expanding it. Gather evidence about the need for additional tokenizers and measure parser throughput, binary size, and large-repository watch cost.
 
 Possible later work, not current features:
