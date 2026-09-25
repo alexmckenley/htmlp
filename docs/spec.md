@@ -63,7 +63,7 @@ Rendering requires every binding, substitutes literal values, and tokenizes ever
 
 `get_element_by_id` searches descendants and returns `ElementRef`, a section or variable reference (the first occurrence for repeated variable names). `sections()` returns direct child sections in source order. `to_string()` extracts text without validation and represents unbound variables as `{{id}}`; it is neither source serialization nor a checked rendered prompt.
 
-The optional `json` feature serializes node variants with a lowercase `kind` discriminator. Sizes are expanded integers. JavaScript consumers need a lossless JSON integer reader for values above `Number.MAX_SAFE_INTEGER`. Source positions use one-based Unicode-scalar line/column and a zero-based UTF-8 byte offset. Zero line/column represents an unavailable location or an in-memory node. The generated [JSON Schema](https://extraloyal.com/htmlp/document.schema.json) describes data shape; semantic invariants still require `lint`.
+The optional `json` feature serializes node variants with a lowercase `kind` discriminator. Sizes are expanded integers. JavaScript consumers need a lossless JSON integer reader for values above `Number.MAX_SAFE_INTEGER`. Source positions use one-based Unicode-scalar line/column and a zero-based UTF-8 byte offset. Zero line/column represents an unavailable location or an in-memory node. The generated [JSON Schema](https://htmlp.dev/document.schema.json) describes data shape; semantic invariants still require `lint`.
 
 The `schema` feature generates the document schema from these Rust types. `cargo doc` generates their API reference. Diagnostic codes and JSON fields are experimental in this alpha.
 

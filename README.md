@@ -65,7 +65,7 @@ Other languages can use the CLI's JSON output and generated schema. Native bindi
 
 ## Documentation
 
-[Website and guide](https://extraloyal.com/htmlp/) · [Specification](docs/spec.md) · [Generated Rust API](https://extraloyal.com/htmlp/api/htmlp/index.html) · [JSON Schema](schema/document.schema.json)
+[Website and guide](https://htmlp.dev/) · [Specification](docs/spec.md) · [Generated Rust API](https://htmlp.dev/api/htmlp/index.html) · [JSON Schema](schema/document.schema.json)
 
 [Contributing](CONTRIBUTING.md) · [Design decisions](docs/decisions.md) · [Roadmap](docs/roadmap.md) · [Security](SECURITY.md)
 
